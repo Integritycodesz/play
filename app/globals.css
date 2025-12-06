@@ -1,26 +1,124 @@
 @import "tailwindcss";
+@plugin "tailwindcss-animate";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@custom-variant dark (&:is(.dark *));
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+@theme {
+  --font-sans: var(--font-outfit);
+  --font-mono: var(--font-geek-geist-mono);
+  --font-syne: var(--font-syne);
+  --font-outfit: var(--font-outfit);
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --animate-marquee: marquee 25s linear infinite;
+
+  @keyframes marquee {
+    from {
+      transform: translateX(0);
+    }
+
+    to {
+      transform: translateX(-50%);
+    }
   }
 }
 
+:root {
+  /* Default to Dark/Ethereal Theme directly */
+  --background: #030303;
+  --foreground: #ffffff;
+
+  --card: #0a0a0a;
+  --card-foreground: #ffffff;
+
+  --popover: #0a0a0a;
+  --popover-foreground: #ffffff;
+
+  --primary: #f2a900;
+  /* Neon Yellow as primary/active */
+  --primary-foreground: #000000;
+
+  --secondary: #141419;
+  --secondary-foreground: #ffffff;
+
+  --muted: #141419;
+  --muted-foreground: #a1a1aa;
+
+  --accent: #141419;
+  --accent-foreground: #ffffff;
+
+  --destructive: #ff2a2a;
+  --destructive-foreground: #ffffff;
+
+  --border: #27272a;
+  --input: #27272a;
+  --ring: #d4d4d8;
+
+  --radius: 0.625rem;
+
+  /* Custom Ethereal Vars */
+  --surface-glass: rgba(255, 255, 255, 0.02);
+  --neon-yellow: #f2a900;
+  --neon-blue: #00f0ff;
+  --neon-violet: #7f00ff;
+  --neon-red: #ff2a2a;
+  --neon-green: #39ff14;
+}
+
+/* Force dark mode values */
+.dark {
+  --background: #030303;
+  --foreground: #ffffff;
+  --card: #0a0a0a;
+  --card-foreground: #ffffff;
+  --popover: #0a0a0a;
+  --popover-foreground: #ffffff;
+  --primary: #f2a900;
+  --primary-foreground: #000000;
+  --secondary: #141419;
+  --secondary-foreground: #ffffff;
+  --muted: #141419;
+  --muted-foreground: #a1a1aa;
+  --accent: #141419;
+  --accent-foreground: #ffffff;
+  --destructive: #ff2a2a;
+  --destructive-foreground: #ffffff;
+  --border: #27272a;
+  --input: #27272a;
+  --ring: #d4d4d8;
+}
+
+/* Base Styles */
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-outfit), sans-serif;
+  overflow-x: hidden;
+  border-color: var(--border);
+}
+
+/* Utilities */
+.glass-panel {
+  background: var(--surface-glass);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.text-gradient {
+  background: linear-gradient(to right, #fff, #aaa);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.mesh-gradient-primary {
+  background: radial-gradient(circle at 0% 0%, var(--neon-violet) 0%, transparent 50%),
+    radial-gradient(circle at 100% 100%, var(--neon-blue) 0%, transparent 50%);
+  filter: blur(100px);
+  opacity: 0.15;
 }
