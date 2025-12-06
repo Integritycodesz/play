@@ -31,11 +31,6 @@ export function Navbar() {
                             Log In
                         </Button>
                     </Link>
-                    <Link href="/register">
-                        <Button className="bg-neon-yellow text-black hover:bg-neon-yellow/90 font-bold">
-                            HOST DASHBOARD
-                        </Button>
-                    </Link>
                 </div>
             </div>
         </nav>

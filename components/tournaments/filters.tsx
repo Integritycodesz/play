@@ -18,9 +18,6 @@ export function TournamentFilters() {
                 <Button variant="outline" className="border-white/10 bg-white/5 text-white hover:bg-white/10">
                     <SlidersHorizontal className="mr-2 h-4 w-4" /> Filters
                 </Button>
-                <Button className="bg-white text-black hover:bg-gray-200">
-                    Create Tournament
-                </Button>
             </div>
         </div>
     );
