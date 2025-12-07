@@ -6,34 +6,46 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Trophy, Medal, Hammer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { supabase } from "@/lib/supabaseClient";
 
 interface TeamScore {
-    id: number;
+    id: string;
     name: string;
-    rank: number | "";
-    kills: number | "";
+    rank: number;
+    kills: number;
     total: number;
 }
 
 export default function LeaderboardPage() {
     const [teams, setTeams] = useState<TeamScore[]>([]);
     const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // Load data from local storage
-        const savedData = localStorage.getItem("leaderboard_data");
-        const savedTime = localStorage.getItem("leaderboard_updated");
+        const fetchLeaderboard = async () => {
+            const { data, error } = await supabase
+                .from('leaderboard')
+                .select('*')
+                .order('total_points', { ascending: false });
 
-        if (savedData) {
-            const parsedData: TeamScore[] = JSON.parse(savedData);
-            // Sort by Total Points (Descending)
-            const sortedTeams = parsedData.sort((a, b) => b.total - a.total);
-            setTeams(sortedTeams);
-        }
+            if (data) {
+                // Map DB columns to UI interface
+                const mappedTeams: TeamScore[] = data.map((item: any, index: number) => ({
+                    id: item.id,
+                    name: item.team_name,
+                    rank: index + 1,
+                    kills: item.kills,
+                    total: item.total_points
+                }));
+                setTeams(mappedTeams);
+                setLastUpdated(new Date().toLocaleTimeString()); // Or use fetched time if available
+            } else {
+                console.error("Error fetching leaderboard:", error);
+            }
+            setLoading(false);
+        };
 
-        if (savedTime) {
-            setLastUpdated(new Date(savedTime).toLocaleString());
-        }
+        fetchLeaderboard();
     }, []);
 
     const getRankIcon = (index: number) => {
@@ -42,6 +54,10 @@ export default function LeaderboardPage() {
         if (index === 2) return <Medal className="h-6 w-6 text-amber-600" />;
         return <span className="text-gray-500 font-bold">#{index + 1}</span>;
     };
+
+    if (loading) {
+        return <div className="min-h-screen flex items-center justify-center text-white">Loading Standings...</div>;
+    }
 
     if (teams.length === 0) {
         return (
@@ -57,12 +73,11 @@ export default function LeaderboardPage() {
                     </div>
 
                     <h1 className="font-syne text-5xl font-bold uppercase text-white md:text-7xl">
-                        Coming <span className="text-neon-blue">Soon</span>
+                        Awaiting <span className="text-neon-blue">Data</span>
                     </h1>
 
                     <p className="mx-auto mt-6 max-w-lg text-lg text-gray-400">
-                        Our global ranking system is currently under construction.
-                        We are tracking data from season 5 to bring you the most accurate leaderboard.
+                        The leaderboard is currently empty. Waiting for the first match results.
                     </p>
 
                     <div className="mt-10">
@@ -84,11 +99,11 @@ export default function LeaderboardPage() {
                     Global <span className="text-neon-yellow">Standings</span>
                 </h1>
                 <p className="text-gray-400">
-                    Live updates from the Winter Championship 2025
+                    Live updates from the database
                 </p>
                 {lastUpdated && (
                     <p className="text-xs text-neon-blue mt-2 animate-pulse">
-                        Last Updated: {lastUpdated}
+                        Last Fetched: {lastUpdated}
                     </p>
                 )}
             </div>

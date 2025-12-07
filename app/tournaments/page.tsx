@@ -4,67 +4,40 @@ import { useState, useEffect } from "react";
 import { TournamentFilters } from "@/components/tournaments/filters";
 import { TournamentCard } from "@/components/tournaments/tournament-card";
 import { Tournament } from "@/types";
-
-// Mock Data
-const tournaments: Tournament[] = [
-    {
-        id: "1",
-        title: "Winter Championship 2025",
-        description: "The biggest event of the season.",
-        banner_url: "/tournament_winter.png",
-        start_date: "2025-12-15",
-        status: "open",
-        prize_pool: 10000,
-        max_slots: 100,
-        registered_teams: 64,
-        format: "squad",
-        rules: ["T1 Rules"],
-    },
-    {
-        id: "2",
-        title: "Friday Night Scrims",
-        description: "Weekly practice for pros.",
-        banner_url: "/tournament_scrims.png",
-        start_date: "2025-12-08",
-        status: "upcoming",
-        prize_pool: 500,
-        max_slots: 20,
-        registered_teams: 5,
-        format: "duo",
-        rules: ["Standard"],
-    },
-    {
-        id: "3",
-        title: "Sniper Only Bash",
-        description: "Headshots only.",
-        banner_url: "/tournament_sniper.png",
-        start_date: "2025-12-10",
-        status: "live",
-        prize_pool: 200,
-        max_slots: 50,
-        registered_teams: 48,
-        format: "solo",
-        rules: ["Snipers Only"],
-    },
-];
+import { supabase } from "@/lib/supabaseClient";
 
 export default function TournamentsPage() {
-    const [allTournaments, setAllTournaments] = useState<Tournament[]>(tournaments);
+    const [allTournaments, setAllTournaments] = useState<Tournament[]>([]);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // Load custom tournaments from local storage
-        const saved = localStorage.getItem("custom_tournaments");
-        if (saved) {
-            try {
-                const custom: Tournament[] = JSON.parse(saved);
-                // Combine mock data + custom data
-                // We add custom first so they appear at top
-                setAllTournaments([...custom, ...tournaments]);
-            } catch (e) {
-                console.error("Failed to parse custom tournaments", e);
+        const fetchTournaments = async () => {
+            const { data, error } = await supabase
+                .from('tournaments')
+                .select('*')
+                .order('start_date', { ascending: true });
+
+            if (data) {
+                setAllTournaments(data as Tournament[]);
+            } else {
+                console.error("Error fetching tournaments:", error);
             }
-        }
+            setLoading(false);
+        };
+
+        fetchTournaments();
     }, []);
+
+    if (loading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center text-white bg-black">
+                <div className="animate-pulse flex flex-col items-center">
+                    <div className="h-12 w-12 border-4 border-neon-yellow border-t-transparent rounded-full animate-spin mb-4"></div>
+                    <span className="font-syne text-xl">Loading Battlegrounds...</span>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="container mx-auto px-4 py-8">
@@ -76,9 +49,15 @@ export default function TournamentsPage() {
             <TournamentFilters />
 
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {allTournaments.map((t) => (
-                    <TournamentCard key={t.id} tournament={t} />
-                ))}
+                {allTournaments.length > 0 ? (
+                    allTournaments.map((t) => (
+                        <TournamentCard key={t.id} tournament={t} />
+                    ))
+                ) : (
+                    <div className="col-span-3 text-center py-20 text-gray-500">
+                        No tournaments found. Run the setup script to create one!
+                    </div>
+                )}
             </div>
         </div>
     );

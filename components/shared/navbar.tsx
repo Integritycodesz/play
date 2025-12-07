@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Gamepad2, Trophy, BarChart2, User } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/lib/supabaseClient";
 
 export function Navbar() {
     const [user, setUser] = useState<any>(null);
@@ -31,7 +32,8 @@ export function Navbar() {
         };
     }, []);
 
-    const handleLogout = () => {
+    const handleLogout = async () => {
+        await supabase.auth.signOut(); // Clear Supabase Session
         localStorage.removeItem("user_session");
         setUser(null);
         window.location.href = "/";

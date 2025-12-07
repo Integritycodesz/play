@@ -8,6 +8,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Save, Trash2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import { supabase } from "@/lib/supabaseClient";
 
 // Standard Point System
 const PLACEMENT_POINTS: Record<number, number> = {
@@ -27,13 +28,9 @@ export function ScoreEntry() {
     const [selectedTournament, setSelectedTournament] = useState<string>("");
     const [selectedMatch, setSelectedMatch] = useState<string>("");
     const [availableMatches, setAvailableMatches] = useState<{ id: string, name: string }[]>([]);
-    const [tournaments, setTournaments] = useState<{ id: string, title: string, matches?: { name: string, map: string }[] }[]>([
-        { id: "1", title: "Winter Championship 2025" },
-        { id: "2", title: "Friday Night Scrims" },
-        { id: "3", title: "Sniper Only Bash" }
-    ]);
+    const [tournaments, setTournaments] = useState<{ id: string, title: string, matches?: { name: string, map: string }[] }[]>([]);
 
-    // Mock initial teams - in real app, fetch based on selectedTournament
+    // Mock initial teams - we will keep this mock momentarily or fetch from teams later
     const [scores, setScores] = useState<TeamScore[]>(
         Array.from({ length: 16 }).map((_, i) => ({
             id: i,
@@ -45,11 +42,13 @@ export function ScoreEntry() {
     );
 
     useEffect(() => {
-        const saved = localStorage.getItem("custom_tournaments");
-        if (saved) {
-            const custom = JSON.parse(saved);
-            setTournaments(prev => [...prev, ...custom]);
-        }
+        const fetchTournaments = async () => {
+            const { data } = await supabase.from('tournaments').select('id, title');
+            if (data) {
+                setTournaments(data);
+            }
+        };
+        fetchTournaments();
     }, []);
 
     // Update available matches when tournament changes

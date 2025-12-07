@@ -39,5 +39,7 @@ export interface Tournament {
     registered_teams: number;
     format: "solo" | "duo" | "squad";
     rules: string[];
+    map_pool?: string[];
+    scoring_rules?: string;
     matches?: { name: string; map: string }[];
 }

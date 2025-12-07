@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
@@ -17,6 +17,38 @@ export default function RegisterPage() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [isLoading, setIsLoading] = useState(false);
+
+    // Auto-Redirect & Restore Session if already logged in
+    useEffect(() => {
+        const checkSession = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+                // Sync LocalStorage
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', session.user.id)
+                    .single();
+
+                const userMeta = {
+                    id: session.user.id,
+                    ign: profile?.ign || session.user.user_metadata?.ign || "Player",
+                    email: session.user.email,
+                    role: profile?.role || "user",
+                    created_at: session.user.created_at
+                };
+
+                localStorage.setItem("user_session", JSON.stringify(userMeta));
+                window.dispatchEvent(new Event("user-login"));
+
+                toast({ title: "Already Logged In", description: "Taking you to dashboard..." });
+
+                if (profile?.role === 'admin') router.push("/admin");
+                else router.push("/dashboard");
+            }
+        };
+        checkSession();
+    }, [router, toast]);
 
     const handleRegister = async () => {
         if (!ign || !email || !password) {

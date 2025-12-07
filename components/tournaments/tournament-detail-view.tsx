@@ -10,59 +10,73 @@ import { TournamentBracket } from "@/components/tournaments/detail/bracket";
 import { TournamentTeams } from "@/components/tournaments/detail/teams";
 import { Tournament } from "@/types";
 import { TournamentJoinButton } from "@/components/tournaments/join-button";
+import { supabase } from "@/lib/supabaseClient";
 
 interface TournamentDetailViewProps {
     id: string;
 }
 
-const MOCK_TOURNAMENT: Tournament = {
-    id: "1",
-    title: "Winter Championship 2025",
-    description: "The biggest event of the season.",
-    banner_url: "/tournament_winter.png",
-    start_date: "2025-12-15",
-    status: "open",
-    prize_pool: 10000,
-    max_slots: 100,
-    registered_teams: 64,
-    format: "squad",
-    rules: ["T1 Rules"],
-};
+
 
 export function TournamentDetailView({ id }: TournamentDetailViewProps) {
     const [tournament, setTournament] = useState<Tournament | null>(null);
+    const [notFound, setNotFound] = useState(false);
 
     useEffect(() => {
-        // 1. Try to find in localStorage
-        const savedTournaments = localStorage.getItem("custom_tournaments");
-        let foundTournament = null;
+        const fetchRealTournament = async () => {
+            // Fetch Real DB ID
+            try {
+                // Try to find ANY existing tournament
+                const { data } = await supabase
+                    .from('tournaments')
+                    .select('*')
+                    .eq('id', id)
+                    .maybeSingle();
 
-        if (savedTournaments) {
-            const parsed = JSON.parse(savedTournaments);
-            foundTournament = parsed.find((t: any) => t.id === id);
-        }
-
-        // 2. If not found, check if it matches the generic mock ID
-        if (!foundTournament && id === "1") {
-            foundTournament = MOCK_TOURNAMENT;
-        }
-
-        // 3. Fallback / Loading state handling
-        if (foundTournament) {
-            // Ensure banner_url logic handles the new optional field fallback
-            if (!foundTournament.banner_url) {
-                foundTournament.banner_url = "/tournament_scrims.png";
+                if (data) {
+                    setTournament(data as Tournament);
+                    setNotFound(false);
+                } else {
+                    console.warn(`Tournament ${id} not found.`);
+                    setTournament(null);
+                    setNotFound(true);
+                }
+            } catch (e) {
+                console.error("Could not fetch tournament", e);
+                setNotFound(true);
             }
-            setTournament(foundTournament);
-        } else {
-            // If completely unknown, maybe set a 404 state or just generic fallback
-            // For now, let's just show the generic mock if nothing matches to prevent crash
-            setTournament(MOCK_TOURNAMENT);
-        }
+        };
+
+        fetchRealTournament();
     }, [id]);
 
+    if (notFound) {
+        return (
+            <div className="min-h-screen bg-black flex flex-col items-center justify-center text-white px-4 text-center">
+                <div className="p-6 rounded-2xl bg-white/5 border border-white/10 max-w-lg backdrop-blur-md">
+                    <Trophy className="h-16 w-16 text-gray-600 mx-auto mb-4" />
+                    <h1 className="font-syne text-3xl font-bold text-white mb-2">Tournament Not Found</h1>
+                    <p className="text-gray-400 mb-6">
+                        The tournament you are looking for does not exist or has been removed.
+                    </p>
+                    <Button
+                        onClick={() => window.location.href = '/tournaments'}
+                        className="bg-neon-yellow text-black font-bold hover:bg-neon-yellow/80"
+                    >
+                        Browse All Tournaments
+                    </Button>
+                </div>
+            </div>
+        )
+    }
+
     if (!tournament) {
-        return <div className="min-h-screen bg-black flex items-center justify-center text-white">Loading...</div>;
+        return (
+            <div className="min-h-screen bg-black flex flex-col items-center justify-center text-white">
+                <div className="animate-spin h-10 w-10 border-4 border-neon-yellow border-t-transparent rounded-full mb-4"></div>
+                <p>Loading Tournament...</p>
+            </div>
+        );
     }
 
     return (
@@ -85,6 +99,8 @@ export function TournamentDetailView({ id }: TournamentDetailViewProps) {
                         {tournament.status.toUpperCase()}
                     </Badge>
                     <h1 className="font-syne text-4xl font-bold uppercase md:text-6xl text-white drop-shadow-lg">{tournament.title}</h1>
+
+
 
                     <div className="mt-6 flex flex-wrap gap-6 text-sm font-medium text-gray-300">
                         <div className="flex items-center gap-2">

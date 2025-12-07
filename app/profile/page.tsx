@@ -57,7 +57,8 @@ export default function ProfilePage() {
         loadProfile();
     }, [router]);
 
-    const handleLogout = () => {
+    const handleLogout = async () => {
+        await supabase.auth.signOut(); // Clear Supabase Session
         localStorage.removeItem("user_session");
         window.dispatchEvent(new Event("user-login"));
         toast({ title: "Logged Out", description: "See you next time!" });

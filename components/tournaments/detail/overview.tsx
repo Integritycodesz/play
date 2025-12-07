@@ -11,20 +11,18 @@ export function TournamentOverview({ tournament }: { tournament: Tournament }) {
                 </CardHeader>
                 <CardContent className="space-y-4 text-gray-400">
                     <p>
-                        <strong>Map Pool:</strong> Erangel, Miramar, Sanhok
+                        <strong>Map Pool:</strong> {(tournament.map_pool || ["Erangel", "Miramar", "Sanhok"]).join(", ")}
                     </p>
-                    <p>
-                        <strong>Scoring:</strong> Official 2025 SUPER Point System.
-                        <br />
-                        1st: 10pts, Elimination: 1pt
-                    </p>
+                    <div className="space-y-1">
+                        <strong>Scoring:</strong>
+                        <div className="whitespace-pre-line text-sm mt-1 pl-2 border-l-2 border-neon-yellow/30">
+                            {tournament.scoring_rules || "Official 2025 SUPER Point System.\n1st: 10pts, Elimination: 1pt"}
+                        </div>
+                    </div>
                     <div className="rounded-lg bg-white/5 p-4">
-                        <h4 className="mb-2 font-bold text-white">General Rules:</h4>
+                        <h4 className="mb-2 font-bold text-white">Tournament Rules:</h4>
                         <ul className="list-disc pl-5">
-                            <li>No emulators allowed.</li>
-                            <li>Team Captain must join Discord.</li>
-                            <li>Screenshots required for rank verification.</li>
-                            {tournament.rules.map((rule, i) => (
+                            {(tournament.rules || ["No custom rules defined."]).map((rule, i) => (
                                 <li key={i}>{rule}</li>
                             ))}
                         </ul>

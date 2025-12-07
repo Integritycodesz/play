@@ -6,15 +6,21 @@ import { NewsManager } from "@/components/admin/news-manager";
 import { TournamentCreator } from "@/components/admin/tournament-creator";
 import { VerifyTeams } from "@/components/admin/verify-teams";
 import { BroadcastManager } from "@/components/admin/broadcast-manager";
-import { Users, Trophy, AlertCircle, FileText, Swords, RotateCcw, FileOutput, Shield, Megaphone } from "lucide-react";
+import { Users, Trophy, AlertCircle, FileText, Swords, FileOutput, Shield, Megaphone } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
 import { useState, useEffect } from "react";
 
+import { supabase } from "@/lib/supabaseClient";
+import { useRouter } from "next/navigation";
+
 export default function AdminPage() {
     const { toast } = useToast();
+    const router = useRouter();
     const [activeTab, setActiveTab] = useState("scores");
+    const [isLoading, setIsLoading] = useState(true);
+    const [isAdmin, setIsAdmin] = useState(false);
 
     // Stats State
     const [stats, setStats] = useState({
@@ -25,39 +31,70 @@ export default function AdminPage() {
     });
 
     useEffect(() => {
-        // Calculate dynamic stats based on local storage data
-        const loadStats = () => {
-            // Tournaments
-            const savedTournaments = localStorage.getItem("custom_tournaments");
-            const customCount = savedTournaments ? JSON.parse(savedTournaments).length : 0;
-            const totalTournaments = 3 + customCount; // 3 Mock + Custom
+        const checkAdmin = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                router.push("/login");
+                return;
+            }
 
-            // Simulated Signups (Real Registrations Only)
-            const savedUsers = localStorage.getItem("registered_users");
-            const realSignups = savedUsers ? JSON.parse(savedUsers).length : 0;
+            // Verify Role in Profiles Table
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('role')
+                .eq('id', user.id)
+                .single();
 
-            // Total Players (In a real app, might differ from signups, but here 1:1)
-            const totalPlayers = realSignups;
+            if (profile?.role !== 'admin') {
+                toast({
+                    title: "Access Denied",
+                    description: "You do not have permission to view this page.",
+                    variant: "destructive"
+                });
+                router.push("/dashboard");
+                return;
+            }
 
-            // Pending Requests (Real data)
-            const savedRequests = localStorage.getItem("tournament_requests");
-            const pendingCount = savedRequests
-                ? JSON.parse(savedRequests).filter((r: any) => r.status === "pending").length
-                : 0;
+            setIsAdmin(true);
 
-            setStats({
-                players: totalPlayers.toLocaleString(),
-                tournaments: totalTournaments.toString(),
-                disputes: pendingCount.toString(),
-                signups: realSignups.toLocaleString() // Matches Total Signups
-            });
+            // Load Stats (Step 2)
+            await loadStats();
+            setIsLoading(false);
         };
 
-        loadStats();
-        // Optional: Listen for storage changes to update in real-time
-        window.addEventListener('storage', loadStats);
-        return () => window.removeEventListener('storage', loadStats);
-    }, []);
+        const loadStats = async () => {
+            try {
+                // 1. Players (Profiles)
+                const { count: playersCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
+
+                // 2. Tournaments
+                const { count: tournamentsCount } = await supabase.from('tournaments').select('*', { count: 'exact', head: true });
+
+                // 3. Pending Requests (Teams with status='pending')
+                const { count: pendingCount } = await supabase.from('teams').select('*', { count: 'exact', head: true }).eq('status', 'pending');
+
+                // 4. Total Signups (Total Teams)
+                const { count: signupsCount } = await supabase.from('teams').select('*', { count: 'exact', head: true });
+
+                setStats({
+                    players: (playersCount || 0).toLocaleString(),
+                    tournaments: (tournamentsCount || 0).toLocaleString(),
+                    disputes: (pendingCount || 0).toLocaleString(),
+                    signups: (signupsCount || 0).toLocaleString()
+                });
+            } catch (e) {
+                console.error("Failed to load admin stats", e);
+            }
+        };
+
+        checkAdmin();
+    }, [router, toast]);
+
+    if (isLoading) {
+        return <div className="flex h-screen items-center justify-center text-neon-blue">Verifying Admin Privileges...</div>;
+    }
+
+    if (!isAdmin) return null;
 
     const handleAction = (action: string) => {
         toast({
