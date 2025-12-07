@@ -32,7 +32,7 @@ export function TournamentCard({ tournament }: TournamentCardProps) {
                 <div className="grid grid-cols-2 gap-4">
                     <InfoItem icon={<Trophy className="text-neon-yellow" />} label="Prize Pool" value={`$${tournament.prize_pool.toLocaleString()}`} />
                     <InfoItem icon={<Users className="text-neon-blue" />} label="Slots" value={`${tournament.registered_teams}/${tournament.max_slots}`} />
-                    <InfoItem icon={<Calendar className="text-neon-green" />} label="Start Date" value={new Date(tournament.start_date).toLocaleDateString()} />
+                    <InfoItem icon={<Calendar className="text-neon-green" />} label="Start Date" value={new Date(tournament.start_date).toLocaleDateString('en-GB')} />
                     <InfoItem icon={<MapPin className="text-neon-red" />} label="Format" value={tournament.format.toUpperCase()} />
                 </div>
             </CardContent>

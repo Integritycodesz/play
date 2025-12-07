@@ -25,6 +25,12 @@
       transform: translateX(-50%);
     }
   }
+
+  --color-neon-yellow: #f2a900;
+  --color-neon-blue: #00f0ff;
+  --color-neon-violet: #7f00ff;
+  --color-neon-red: #ff2a2a;
+  --color-neon-green: #39ff14;
 }
 
 :root {

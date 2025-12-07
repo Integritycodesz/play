@@ -1,4 +1,4 @@
-import { Github, Twitter, Instagram } from "lucide-react";
+import { Youtube, Twitter, Instagram } from "lucide-react";
 
 export function Footer() {
     return (
@@ -13,9 +13,9 @@ export function Footer() {
                     </div>
 
                     <div className="flex gap-6">
-                        <SocialLink icon={<Twitter className="h-5 w-5" />} href="#" />
-                        <SocialLink icon={<Instagram className="h-5 w-5" />} href="#" />
-                        <SocialLink icon={<Github className="h-5 w-5" />} href="#" />
+                        <SocialLink icon={<Twitter className="h-5 w-5" />} href="https://twitter.com" />
+                        <SocialLink icon={<Instagram className="h-5 w-5" />} href="https://instagram.com" />
+                        <SocialLink icon={<Youtube className="h-5 w-5" />} href="https://youtube.com" />
                     </div>
                 </div>
                 <div className="mt-8 text-center text-xs text-gray-600">

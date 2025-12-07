@@ -13,7 +13,7 @@ const myTournaments: Tournament[] = [
         id: "2",
         title: "Friday Night Scrims",
         description: "Weekly practice for pros.",
-        banner_url: "/placeholder.jpg",
+        banner_url: "/tournament_scrims.png",
         start_date: "2025-12-08",
         status: "upcoming",
         prize_pool: 500,

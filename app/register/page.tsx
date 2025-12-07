@@ -1,10 +1,85 @@
+"use client";
+
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import Link from "next/link";
 import { UserPlus } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useToast } from "@/components/ui/use-toast";
 
 export default function RegisterPage() {
+    const router = useRouter();
+    const { toast } = useToast();
+    const [ign, setIgn] = useState("");
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
+
+    import { supabase } from "@/lib/supabaseClient";
+    import { Loader2 } from "lucide-react";
+
+    // ... inside component ...
+    const [isLoading, setIsLoading] = useState(false);
+
+    const handleRegister = async () => {
+        if (!ign || !email || !password) {
+            toast({
+                title: "Error",
+                description: "Please fill in all fields.",
+                variant: "destructive"
+            });
+            return;
+        }
+
+        setIsLoading(true);
+
+        try {
+            // 1. SignUp with Supabase
+            const { data, error } = await supabase.auth.signUp({
+                email,
+                password,
+                options: {
+                    data: {
+                        ign: ign, // Metadata to be copied to profiles table via trigger
+                    },
+                },
+            });
+
+            if (error) throw error;
+
+            if (data.user) {
+                // 2. Hybrid Sync: Set LocalStorage Session for existing components
+                const userSession = {
+                    id: data.user.id,
+                    ign: ign,
+                    email: email,
+                    role: "user", // Default
+                    created_at: new Date().toISOString()
+                };
+
+                localStorage.setItem("user_session", JSON.stringify(userSession));
+                window.dispatchEvent(new Event("user-login"));
+
+                toast({
+                    title: "Welcome, " + ign,
+                    description: "Registration successful! Please check your email to confirm.",
+                    className: "bg-neon-green text-black border-none"
+                });
+
+                router.push("/dashboard");
+            }
+        } catch (error: any) {
+            toast({
+                title: "Registration Failed",
+                description: error.message || "Something went wrong.",
+                variant: "destructive"
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     return (
         <div className="flex min-h-[80vh] items-center justify-center px-4">
             <Card className="glass-panel w-full max-w-md border-white/10">
@@ -17,17 +92,37 @@ export default function RegisterPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
-                        <Input placeholder="IGN (In-Game Name)" className="bg-white/5 border-white/10" />
+                        <Input
+                            placeholder="IGN (In-Game Name)"
+                            className="bg-white/5 border-white/10"
+                            value={ign}
+                            onChange={(e) => setIgn(e.target.value)}
+                        />
                         <Input placeholder="PUBG ID" className="bg-white/5 border-white/10" />
                     </div>
-                    <Input placeholder="Email" type="email" className="bg-white/5 border-white/10" />
-                    <Input placeholder="Password" type="password" className="bg-white/5 border-white/10" />
+                    <Input
+                        placeholder="Email"
+                        type="email"
+                        className="bg-white/5 border-white/10"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                    />
+                    <Input
+                        placeholder="Password"
+                        type="password"
+                        className="bg-white/5 border-white/10"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                    />
                     <Input placeholder="Confirm Password" type="password" className="bg-white/5 border-white/10" />
                 </CardContent>
                 <CardFooter className="flex flex-col gap-4">
-                    <Link href="/dashboard" className="w-full">
-                        <Button className="w-full bg-neon-blue text-black font-bold hover:bg-neon-blue/90">Register</Button>
-                    </Link>
+                    <Button
+                        className="w-full bg-neon-blue text-black font-bold hover:bg-neon-blue/90"
+                        onClick={handleRegister}
+                    >
+                        Register
+                    </Button>
                     <div className="text-center text-sm text-gray-400">
                         Already have an account? <Link href="/login" className="text-neon-yellow hover:underline">Log in</Link>
                     </div>

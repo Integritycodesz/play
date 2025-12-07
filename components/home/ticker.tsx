@@ -4,10 +4,13 @@ import { Trophy } from "lucide-react";
 
 export function Ticker() {
     const items = [
-        "🏆 Team Soul wins Winter Cup ($10,000)",
-        "🔥 GodLike Esports qualifies for Finals",
-        "📢 Season 6 Registration starts next week",
-        "🔴 Live: Grand Finals - Match 3 in progress",
+        "💀 Pochinki is my city",
+        "🛑 revive me bro I have raygun (jk)",
+        "🍳 Pan > AWM",
+        "🏃‍♂️ Zone shrinking in 3... 2... 1...",
+        "📦 I need 5.56 ammo pls",
+        "🎮 One more game then sleep (lies)",
+        "🍗 Winner Winner Chicken Dinner",
     ];
 
     return (
