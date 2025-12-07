@@ -2,37 +2,41 @@ import { useState, useEffect } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Users, Crown } from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
 
 interface TournamentTeamsProps {
     tournamentId: string;
 }
 
 export function TournamentTeams({ tournamentId }: TournamentTeamsProps) {
-    // 1. Read 'approved' requests from localStorage
     const [teams, setTeams] = useState<any[]>([]);
 
     useEffect(() => {
-        // Initial load
-        const loadTeams = () => {
-            const requests = JSON.parse(localStorage.getItem("tournament_requests") || "[]");
-            // Filter for this tournament AND approved status
-            const approvedTeams = requests.filter((r: any) => r.tournamentId === tournamentId && r.status === "approved");
+        const loadTeams = async () => {
+            try {
+                const { data, error } = await supabase
+                    .from('teams')
+                    .select('*, captain:profiles(ign)')
+                    .eq('tournament_id', tournamentId)
+                    .eq('status', 'approved'); // Only show Approved teams
 
-            // Map to UI format
-            const uiTeams = approvedTeams.map((t: any, i: number) => ({
-                id: i,
-                name: t.teamName || t.ign + "'s Team",
-                captain: t.ign,
-                status: "Ready",
-                avatarSeed: t.ign // Use IGN for avatar consistency
-            }));
-
-            setTeams(uiTeams);
+                if (data && !error) {
+                    const realTeams = data.map((t: any) => ({
+                        id: t.id,
+                        name: t.team_name,
+                        captain: t.captain?.ign || "Unknown",
+                        status: "Ready",
+                        avatarSeed: t.captain?.ign || t.team_name
+                    }));
+                    setTeams(realTeams);
+                }
+            } catch (err) {
+                console.warn("Supabase fetch error", err);
+            }
         };
 
         loadTeams();
-        // Poll for updates (in case admin approves while viewing)
-        const interval = setInterval(loadTeams, 3000);
+        const interval = setInterval(loadTeams, 5000);
         return () => clearInterval(interval);
     }, [tournamentId]);
 

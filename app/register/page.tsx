@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import Link from "next/link";
-import { UserPlus } from "lucide-react";
+import { UserPlus, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
+import { supabase } from "@/lib/supabaseClient";
 
 export default function RegisterPage() {
     const router = useRouter();
@@ -15,11 +16,6 @@ export default function RegisterPage() {
     const [ign, setIgn] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
-
-    import { supabase } from "@/lib/supabaseClient";
-    import { Loader2 } from "lucide-react";
-
-    // ... inside component ...
     const [isLoading, setIsLoading] = useState(false);
 
     const handleRegister = async () => {
@@ -120,8 +116,10 @@ export default function RegisterPage() {
                     <Button
                         className="w-full bg-neon-blue text-black font-bold hover:bg-neon-blue/90"
                         onClick={handleRegister}
+                        disabled={isLoading}
                     >
-                        Register
+                        {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        {isLoading ? "Signing Up..." : "Register"}
                     </Button>
                     <div className="text-center text-sm text-gray-400">
                         Already have an account? <Link href="/login" className="text-neon-yellow hover:underline">Log in</Link>

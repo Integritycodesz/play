@@ -9,6 +9,8 @@ import { Gamepad2, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
 
+import { supabase } from "@/lib/supabaseClient";
+
 export default function LoginPage() {
     const router = useRouter();
     const { toast } = useToast();
@@ -22,72 +24,61 @@ export default function LoginPage() {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
-    const handleLogin = (e: React.FormEvent) => {
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
 
-        setTimeout(() => {
-            const savedUsers = localStorage.getItem("registered_users");
-            const users = savedUsers ? JSON.parse(savedUsers) : [];
+        // 1. Try Supabase Login
+        try {
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email: formData.email,
+                password: formData.password
+            });
 
-            // Find user matching credentials logic would go here
-            // For now, since we didn't implement robust password hashing in register, 
-            // we'll just check if the email exists. 
-            // In a real app, verify password hash.
-            const user = users.find((u: any) => u.email === formData.email);
+            if (data.user && !error) {
+                // Success: Get Profile Data
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', data.user.id)
+                    .single();
 
-            if (user) {
-                if (user.password === formData.password) {
-                    // Don't store password in session
-                    const { password, ...sessionUser } = user;
-                    localStorage.setItem("user_session", JSON.stringify(sessionUser));
-                    window.dispatchEvent(new Event("user-login"));
+                // Use profile data or metadata
+                const ign = profile?.ign || data.user.user_metadata?.ign || "Player";
+                const role = profile?.role || "user";
 
-                    toast({
-                        title: "Welcome back, " + user.ign,
-                        description: "Successfully logged in.",
-                        className: "bg-neon-green text-black border-none"
-                    });
+                const sessionUser = {
+                    id: data.user.id,
+                    ign: ign,
+                    email: data.user.email,
+                    role: role,
+                    created_at: data.user.created_at
+                };
 
-                    if (user.role === 'admin') {
-                        router.push("/admin");
-                    } else {
-                        router.push("/dashboard");
-                    }
-                } else {
-                    toast({ title: "Login Failed", description: "Invalid password.", variant: "destructive" });
-                    setIsLoading(false);
-                }
-            } else {
-                // Fallback for Admin testing: If email is "admin@pmpl.gg" and password "admin", allow
-                if (formData.email === "admin@pmpl.gg" && formData.password === "admin") {
-                    const adminUser = { id: "admin", ign: "SuperAdmin", email: "admin@pmpl.gg", role: "admin" };
-                    localStorage.setItem("user_session", JSON.stringify(adminUser));
-                    window.dispatchEvent(new Event("user-login"));
-                    toast({ title: "Admin Access", description: "Logged in as Super Admin" });
-                    router.push("/admin");
-                } else if (formData.email === "demo@pmpl.gg" && formData.password === "demo123") {
-                    const demoUser = {
-                        id: "demo-user",
-                        ign: "DemoPlayer",
-                        email: "demo@pmpl.gg",
-                        role: "user",
-                        created_at: new Date().toISOString()
-                    };
-                    localStorage.setItem("user_session", JSON.stringify(demoUser));
-                    window.dispatchEvent(new Event("user-login"));
-                    toast({ title: "Demo Access", description: "Logged in as Demo Player" });
-                    router.push("/dashboard");
-                } else {
-                    toast({
-                        title: "Login Failed",
-                        description: "Invalid email or password. Try registering first.",
-                        variant: "destructive"
-                    });
-                    setIsLoading(false);
-                }
+                localStorage.setItem("user_session", JSON.stringify(sessionUser));
+                window.dispatchEvent(new Event("user-login"));
+
+                toast({
+                    title: "Welcome back, " + ign,
+                    description: "Successfully logged in via Supabase.",
+                    className: "bg-neon-green text-black border-none"
+                });
+
+                if (role === 'admin') router.push("/admin");
+                else router.push("/dashboard");
+
+                return; // Stop here if successful
             }
-        }, 1000);
+        } catch (err: any) {
+            console.error("Login error", err);
+            toast({
+                title: "Login Failed",
+                description: err.message || "Invalid credentials.",
+                variant: "destructive"
+            });
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -130,25 +121,6 @@ export default function LoginPage() {
                             {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                             {isLoading ? "Signing In..." : "Sign In"}
                         </Button>
-
-                        {/* Demo Credentials Helper */}
-                        <div className="bg-white/5 p-4 rounded-lg text-xs space-y-2 border border-white/10 w-full">
-                            <p className="font-bold text-gray-300 mb-1">Demo Credentials:</p>
-                            <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                    <span className="block text-neon-blue">Admin</span>
-                                    <span className="text-gray-500">admin@pmpl.gg</span>
-                                    <br />
-                                    <span className="text-gray-500">Pass: admin</span>
-                                </div>
-                                <div>
-                                    <span className="block text-neon-yellow">Player</span>
-                                    <span className="text-gray-500">demo@pmpl.gg</span>
-                                    <br />
-                                    <span className="text-gray-500">Pass: demo123</span>
-                                </div>
-                            </div>
-                        </div>
 
                         <div className="text-center text-sm text-gray-400">
                             Don't have an account? <Link href="/register" className="text-neon-blue hover:underline">Sign up</Link>

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { useRouter } from "next/navigation";
 import { Check, Clock, XCircle } from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
 
 export function TournamentJoinButton({ tournamentId }: { tournamentId: string }) {
     const { toast } = useToast();
@@ -13,28 +14,35 @@ export function TournamentJoinButton({ tournamentId }: { tournamentId: string })
     const [isLoading, setIsLoading] = useState(false);
 
     useEffect(() => {
-        const checkStatus = () => {
-            const session = localStorage.getItem("user_session");
-            if (session) {
-                const user = JSON.parse(session);
-                const requests = JSON.parse(localStorage.getItem("tournament_requests") || "[]");
+        const checkStatus = async () => {
+            const localSession = localStorage.getItem("user_session");
+            if (!localSession) return;
+            const user = JSON.parse(localSession);
 
-                // Find explicit request for this user & tournament
-                const myRequest = requests.find((r: any) => r.userId === user.id && r.tournamentId === tournamentId);
+            if (user.id) {
+                try {
+                    const { data, error } = await supabase
+                        .from('teams')
+                        .select('status')
+                        .eq('tournament_id', tournamentId)
+                        .eq('captain_id', user.id)
+                        .maybeSingle();
 
-                if (myRequest) {
-                    setStatus(myRequest.status);
+                    if (data) {
+                        setStatus(data.status as any);
+                    }
+                } catch (err) {
+                    console.error("Supabase check failed", err);
                 }
             }
         };
 
         checkStatus();
-        // Poll for updates in case admin approves while user is on page
-        const interval = setInterval(checkStatus, 2000);
+        const interval = setInterval(checkStatus, 5000);
         return () => clearInterval(interval);
     }, [tournamentId]);
 
-    const handleJoin = () => {
+    const handleJoin = async () => {
         setIsLoading(true);
         const session = localStorage.getItem("user_session");
 
@@ -49,33 +57,36 @@ export function TournamentJoinButton({ tournamentId }: { tournamentId: string })
         }
 
         const user = JSON.parse(session);
-        const requests = JSON.parse(localStorage.getItem("tournament_requests") || "[]");
 
-        // Create Request
-        const newRequest = {
-            id: Date.now().toString(),
-            tournamentId,
-            userId: user.id,
-            ign: user.ign,
-            teamName: user.ign + "'s Team",
-            isCaptain: true, // Mark registrant as captain
-            captainId: user.id,
-            status: "pending", // Now PENDING by default
-            requestedAt: new Date().toISOString()
-        };
+        // Try Supabase Insert
+        try {
+            const { error } = await supabase
+                .from('teams')
+                .insert({
+                    tournament_id: tournamentId,
+                    captain_id: user.id,
+                    team_name: `${user.ign}'s Team`,
+                    status: 'pending'
+                });
 
-        requests.push(newRequest);
-        localStorage.setItem("tournament_requests", JSON.stringify(requests));
+            if (error) throw error;
 
-        setTimeout(() => {
             setStatus("pending");
-            setIsLoading(false);
             toast({
                 title: "Request Sent",
                 description: "Your participation request is awaiting admin approval.",
                 className: "bg-yellow-500 text-black border-none"
             });
-        }, 600);
+        } catch (err: any) {
+            console.error("Supabase join failed:", err);
+            toast({
+                title: "Error",
+                description: "Could not register team. " + err.message,
+                variant: "destructive"
+            });
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     if (status === "approved") {

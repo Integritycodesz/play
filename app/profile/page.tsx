@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { User, Mail, Calendar, Trophy, Crown, Loader2, LogOut } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import { supabase } from "@/lib/supabaseClient";
 
 export default function ProfilePage() {
     const router = useRouter();
@@ -18,7 +19,7 @@ export default function ProfilePage() {
 
     useEffect(() => {
         // Auth Guard & Data Fetching
-        const loadProfile = () => {
+        const loadProfile = async () => {
             const session = localStorage.getItem("user_session");
             if (!session) {
                 router.push("/login");
@@ -28,12 +29,29 @@ export default function ProfilePage() {
             const userData = JSON.parse(session);
             setUser(userData);
 
-            // Fetch Registrations
-            const allRequests = JSON.parse(localStorage.getItem("tournament_requests") || "[]");
-            const myRequests = allRequests.filter((r: any) => r.userId === userData.id);
-            setRegistrations(myRequests);
+            // Fetch Registrations from Supabase
+            try {
+                const { data, error } = await supabase
+                    .from('teams')
+                    .select('*')
+                    .eq('captain_id', userData.id);
 
-            setIsLoading(false);
+                if (data && !error) {
+                    const dbRegs = data.map((t: any) => ({
+                        id: t.id,
+                        tournamentId: t.tournament_id,
+                        teamName: t.team_name,
+                        isCaptain: true,
+                        status: t.status,
+                        requestedAt: t.created_at
+                    }));
+                    setRegistrations(dbRegs);
+                }
+            } catch (err) {
+                console.error("Profile fetch error", err);
+            } finally {
+                setIsLoading(false);
+            }
         };
 
         loadProfile();
