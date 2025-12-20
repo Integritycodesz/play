@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Users, Trophy, Calendar, MapPin } from "lucide-react";
 import Link from "next/link";
 import { Tournament } from "@/types";
+import Image from "next/image";
 
 interface TournamentCardProps {
     tournament: Tournament;
@@ -15,10 +16,12 @@ export function TournamentCard({ tournament }: TournamentCardProps) {
             {/* Banner */}
             <div className="relative h-48 w-full overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent z-10" />
-                <img
-                    src={tournament.banner_url}
+                <Image
+                    src={tournament.banner_url || "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=800&q=80"}
                     alt={tournament.title}
-                    className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    fill
+                    className="object-cover group-hover:scale-105 transition-transform duration-500"
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                 />
                 <Badge className="absolute left-4 top-4 z-20 bg-neon-yellow text-black font-bold uppercase">
                     {tournament.status}

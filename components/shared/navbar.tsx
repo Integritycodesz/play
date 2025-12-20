@@ -2,41 +2,84 @@
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Gamepad2, Trophy, BarChart2, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabaseClient";
+import { useToast } from "@/components/ui/use-toast";
 
 export function Navbar() {
+    const { toast } = useToast();
+    const router = useRouter();
     const [user, setUser] = useState<any>(null);
 
     useEffect(() => {
-        const checkAuth = () => {
-            const session = localStorage.getItem("user_session");
-            if (session) {
-                setUser(JSON.parse(session));
+        const getUser = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.user) {
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', session.user.id)
+                    .single();
+
+                if (profile?.is_banned) {
+                    toast({
+                        title: "ACCOUNT SUSPENDED",
+                        description: "Your account is banned. Access is restricted.",
+                        variant: "destructive",
+                        duration: 10000
+                    });
+                }
+
+                setUser({
+                    ...session.user,
+                    ign: profile?.ign || session.user.user_metadata?.ign,
+                    role: profile?.role || 'user',
+                    is_banned: profile?.is_banned || false
+                });
             } else {
                 setUser(null);
             }
         };
 
-        checkAuth();
-        window.addEventListener('storage', checkAuth);
+        getUser();
 
-        // Custom event for immediate UI updates within same tab
-        window.addEventListener('user-login', checkAuth);
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+            if (session?.user) {
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', session.user.id)
+                    .single();
 
-        return () => {
-            window.removeEventListener('storage', checkAuth);
-            window.removeEventListener('user-login', checkAuth);
-        };
+                if (profile?.is_banned) {
+                    toast({
+                        title: "ACCOUNT SUSPENDED",
+                        description: "You have been banned by an administrator.",
+                        variant: "destructive"
+                    });
+                }
+
+                setUser({
+                    ...session.user,
+                    ign: profile?.ign || session.user.user_metadata?.ign,
+                    role: profile?.role || 'user',
+                    is_banned: profile?.is_banned || false
+                });
+            } else {
+                setUser(null);
+            }
+        });
+
+        return () => subscription.unsubscribe();
     }, []);
 
     const handleLogout = async () => {
-        await supabase.auth.signOut(); // Clear Supabase Session
-        localStorage.removeItem("user_session");
+        await supabase.auth.signOut();
         setUser(null);
-        window.location.href = "/";
+        router.push("/");
     };
 
     return (

@@ -45,8 +45,8 @@ export default function LoginPage() {
                     created_at: session.user.created_at
                 };
 
-                localStorage.setItem("user_session", JSON.stringify(userMeta));
-                window.dispatchEvent(new Event("user-login")); // Updates Navbar immediately
+                // localStorage.setItem("user_session", JSON.stringify(userMeta));
+                // window.dispatchEvent(new Event("user-login")); // Updates Navbar immediately
 
                 toast({ title: "Welcome Back", description: "Redirecting to dashboard..." });
 
@@ -89,8 +89,8 @@ export default function LoginPage() {
                     created_at: data.user.created_at
                 };
 
-                localStorage.setItem("user_session", JSON.stringify(sessionUser));
-                window.dispatchEvent(new Event("user-login"));
+                // localStorage.setItem("user_session", JSON.stringify(sessionUser));
+                // window.dispatchEvent(new Event("user-login"));
 
                 toast({
                     title: "Welcome back, " + ign,
@@ -148,6 +148,11 @@ export default function LoginPage() {
                                 onChange={handleChange}
                                 required
                             />
+                            <div className="flex justify-end">
+                                <Link href="/forgot-password" className="text-xs text-gray-400 hover:text-white hover:underline">
+                                    Forgot password?
+                                </Link>
+                            </div>
                         </div>
                     </CardContent>
                     <CardFooter className="flex flex-col gap-4">

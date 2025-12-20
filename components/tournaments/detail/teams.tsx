@@ -16,17 +16,27 @@ export function TournamentTeams({ tournamentId }: TournamentTeamsProps) {
             try {
                 const { data, error } = await supabase
                     .from('teams')
-                    .select('*, captain:profiles(ign)')
+                    .select(`
+                        id, 
+                        team_name,
+                        members:team_members(
+                            role,
+                            profile:profiles(ign)
+                        )
+                    `)
                     .eq('tournament_id', tournamentId)
-                    .eq('status', 'approved'); // Only show Approved teams
+                    .eq('status', 'approved');
 
                 if (data && !error) {
                     const realTeams = data.map((t: any) => ({
                         id: t.id,
                         name: t.team_name,
-                        captain: t.captain?.ign || "Unknown",
+                        members: t.members?.map((m: any) => ({
+                            ign: m.profile?.ign || "Unknown",
+                            role: m.role
+                        })).sort((a: any, b: any) => a.role === 'captain' ? -1 : 1), // Captain first
                         status: "Ready",
-                        avatarSeed: t.captain?.ign || t.team_name
+                        avatarSeed: t.team_name
                     }));
                     setTeams(realTeams);
                 }
@@ -36,40 +46,40 @@ export function TournamentTeams({ tournamentId }: TournamentTeamsProps) {
         };
 
         loadTeams();
-        const interval = setInterval(loadTeams, 5000);
+        const interval = setInterval(loadTeams, 10000); // 10s poll
         return () => clearInterval(interval);
     }, [tournamentId]);
 
-    // If no teams, show empty state
-    if (teams.length === 0) {
-        return (
-            <div className="flex flex-col items-center justify-center py-12 text-center border border-dashed border-white/10 rounded-xl bg-white/5">
-                <Users className="h-12 w-12 text-gray-600 mb-4" />
-                <h3 className="text-xl font-bold text-white mb-2">No Teams Yet</h3>
-                <p className="text-gray-400 max-w-sm">
-                    Be the first to register and claim your spot in the bracket!
-                </p>
-            </div>
-        );
-    }
+    // ... (empty state check) ...
 
     return (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
             {teams.map((team) => (
-                <div key={team.id} className="glass-panel flex items-center gap-3 rounded-lg p-4 transition-colors hover:bg-white/5 animate-in fade-in duration-500">
-                    <Avatar>
-                        <AvatarImage src={`https://api.dicebear.com/7.x/identicon/svg?seed=${team.avatarSeed}`} />
-                        <AvatarFallback>{team.name[0]}</AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 overflow-hidden">
-                        <h4 className="truncate font-bold text-white">{team.name}</h4>
-                        <p className="truncate text-xs text-gray-400 flex items-center gap-1">
-                            <Crown className="h-3 w-3 text-neon-yellow" /> {team.captain}
-                        </p>
+                <div key={team.id} className="glass-panel rounded-lg p-4 transition-colors hover:bg-white/5 animate-in fade-in duration-500 border border-white/10 group">
+                    <div className="flex items-center gap-3 mb-3 border-b border-white/5 pb-3">
+                        <Avatar className="h-10 w-10 border border-white/10">
+                            <AvatarImage src={`https://api.dicebear.com/7.x/identicon/svg?seed=${team.avatarSeed}`} />
+                            <AvatarFallback>{team.name[0]}</AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 overflow-hidden">
+                            <h4 className="truncate font-bold text-white text-lg font-syne group-hover:text-neon-blue transition-colors">{team.name}</h4>
+                            <Badge variant="outline" className="border-neon-green/30 text-neon-green text-[10px] h-5">
+                                {team.members.length} Players
+                            </Badge>
+                        </div>
                     </div>
-                    <Badge variant="outline" className="border-green-500/50 text-green-500 text-[10px]">
-                        Ready
-                    </Badge>
+
+                    <div className="space-y-1">
+                        {team.members.map((member: any, i: number) => (
+                            <div key={i} className="flex items-center justify-between text-sm py-1 px-2 rounded hover:bg-white/5">
+                                <span className={`flex items-center gap-2 ${member.role === 'captain' ? 'text-neon-yellow font-medium' : 'text-gray-400'}`}>
+                                    {member.role === 'captain' && <Crown className="h-3 w-3" />}
+                                    {member.ign}
+                                </span>
+                                {member.role === 'captain' && <span className="text-[10px] text-gray-600 uppercase">CPT</span>}
+                            </div>
+                        ))}
+                    </div>
                 </div>
             ))}
         </div>

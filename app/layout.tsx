@@ -31,6 +31,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <body
+        suppressHydrationWarning
         className={`${outfit.variable} ${syne.variable} bg-background font-sans text-foreground antialiased selection:bg-neon-yellow/30`}
       >
         <GlobalBroadcast />

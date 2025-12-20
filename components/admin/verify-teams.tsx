@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Check, X, Shield, Swords } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { Input } from "@/components/ui/input";
+import { supabase } from "@/lib/supabaseClient";
 
 interface TournamentRequest {
     id: string;
@@ -24,30 +25,61 @@ export function VerifyTeams() {
     const [requests, setRequests] = useState<TournamentRequest[]>([]);
     const [search, setSearch] = useState("");
 
-    const loadRequests = () => {
-        const saved = localStorage.getItem("tournament_requests");
-        if (saved) {
-            setRequests(JSON.parse(saved).reverse());
+    const loadRequests = async () => {
+        const { data } = await supabase
+            .from('teams')
+            .select(`
+                id,
+                tournament_id,
+                captain_id,
+                team_name,
+                status,
+                created_at,
+                profiles:captain_id (ign)
+            `)
+            .eq('status', 'pending')
+            .order('created_at', { ascending: false });
+
+        if (data) {
+            const formatted = data.map((t: any) => ({
+                id: t.id,
+                tournamentId: t.tournament_id,
+                userId: t.captain_id,
+                ign: t.profiles?.ign || "Unknown",
+                teamName: t.team_name,
+                status: t.status,
+                requestedAt: t.created_at
+            }));
+            setRequests(formatted);
         }
     };
 
     useEffect(() => {
         loadRequests();
-        window.addEventListener('storage', loadRequests);
-        return () => window.removeEventListener('storage', loadRequests);
+        // Subscribe to real-time changes for new requests
+        const channel = supabase
+            .channel('admin-teams')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'teams' }, () => {
+                loadRequests();
+            })
+            .subscribe();
+
+        return () => { supabase.removeChannel(channel); };
     }, []);
 
-    const updateStatus = (id: string, newStatus: "approved" | "rejected") => {
-        const updated = requests.map(r =>
-            r.id === id ? { ...r, status: newStatus } : r
-        );
-        setRequests(updated);
-        localStorage.setItem("tournament_requests", JSON.stringify(updated.reverse()));
-        setRequests(updated.reverse());
+    const updateStatus = async (id: string, newStatus: "approved" | "rejected") => {
+        const { error } = await supabase
+            .from('teams')
+            .update({ status: newStatus })
+            .eq('id', id);
 
-        // If approved, strictly speaking we should also add to 'tournament_participants_[id]'
-        // BUT our JoinButton logic now looks at 'tournament_requests' directly, 
-        // so upgrading the status there is sufficient for the UI to update.
+        if (error) {
+            toast({ title: "Error", description: "Failed to update status", variant: "destructive" });
+            return;
+        }
+
+        // Optimistic update locally
+        setRequests(prev => prev.filter(r => r.id !== id));
 
         toast({
             title: newStatus === "approved" ? "Request Approved" : "Request Rejected",

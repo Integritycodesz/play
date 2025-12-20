@@ -30,16 +30,16 @@ export default function RegisterPage() {
                     .eq('id', session.user.id)
                     .single();
 
-                const userMeta = {
-                    id: session.user.id,
-                    ign: profile?.ign || session.user.user_metadata?.ign || "Player",
-                    email: session.user.email,
-                    role: profile?.role || "user",
-                    created_at: session.user.created_at
-                };
+                // const userMeta = {
+                //     id: session.user.id,
+                //     ign: profile?.ign || session.user.user_metadata?.ign || "Player",
+                //     email: session.user.email,
+                //     role: profile?.role || "user",
+                //     created_at: session.user.created_at
+                // };
 
-                localStorage.setItem("user_session", JSON.stringify(userMeta));
-                window.dispatchEvent(new Event("user-login"));
+                // localStorage.setItem("user_session", JSON.stringify(userMeta));
+                // window.dispatchEvent(new Event("user-login"));
 
                 toast({ title: "Already Logged In", description: "Taking you to dashboard..." });
 
@@ -78,16 +78,16 @@ export default function RegisterPage() {
 
             if (data.user) {
                 // 2. Hybrid Sync: Set LocalStorage Session for existing components
-                const userSession = {
-                    id: data.user.id,
-                    ign: ign,
-                    email: email,
-                    role: "user", // Default
-                    created_at: new Date().toISOString()
-                };
+                // const userSession = {
+                //     id: data.user.id,
+                //     ign: ign,
+                //     email: email,
+                //     role: "user", // Default
+                //     created_at: new Date().toISOString()
+                // };
 
-                localStorage.setItem("user_session", JSON.stringify(userSession));
-                window.dispatchEvent(new Event("user-login"));
+                // localStorage.setItem("user_session", JSON.stringify(userSession));
+                // window.dispatchEvent(new Event("user-login"));
 
                 toast({
                     title: "Welcome, " + ign,

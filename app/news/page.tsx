@@ -1,49 +1,58 @@
+"use client";
+
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Calendar, ArrowRight, User } from "lucide-react";
 import Link from "next/link";
-
-const newsItems = [
-    {
-        id: 1,
-        title: "Season 6 Patch Notes: New Weapons & Balance Changes",
-        category: "Update",
-        date: "Dec 05, 2025",
-        author: "Dev Team",
-        image: "/news-patch-v2.png",
-        excerpt: "Everything you need to know about the upcoming season, including the new AMR sniper and vehicle physics overhaul."
-    },
-    {
-        id: 2,
-        title: "Winter Championship: Grand Finals Recap",
-        category: "Esports",
-        date: "Dec 04, 2025",
-        author: "PMPL Staff",
-        image: "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=2070&auto=format&fit=crop",
-        excerpt: "Team Soul takes the trophy in a nail-biting finish on Erangel."
-    },
-    {
-        id: 3,
-        title: "Community Spotlight: Top Plays of the Week",
-        category: "Community",
-        date: "Dec 02, 2025",
-        author: "Community Mgr",
-        image: "https://images.unsplash.com/photo-1593305841991-05c2e4395270?q=80&w=2070&auto=format&fit=crop",
-        excerpt: "Check out these insane 1v4 clutches from our scrims."
-    },
-    {
-        id: 4,
-        title: "Server Maintenance Schedule",
-        category: "System",
-        date: "Dec 01, 2025",
-        author: "SysAdmin",
-        image: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=2070&auto=format&fit=crop",
-        excerpt: "Scheduled downtime for improved stability and tick rate upgrades."
-    }
-];
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabaseClient";
 
 export default function NewsPage() {
+    const [newsItems, setNewsItems] = useState<any[]>([]);
+
+    useEffect(() => {
+        const loadNews = async () => {
+            const { data } = await supabase
+                .from('news')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (data) {
+                const formatted = data.map((item: any) => ({
+                    id: item.id,
+                    title: item.title,
+                    category: item.category,
+                    date: new Date(item.created_at).toLocaleDateString(),
+                    author: item.author,
+                    image: item.image,
+                    excerpt: item.excerpt
+                }));
+                setNewsItems(formatted);
+            }
+        };
+        loadNews();
+
+        // Optional: Real-time subscription
+        const channel = supabase
+            .channel('public-news')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'news' }, () => {
+                loadNews();
+            })
+            .subscribe();
+
+        return () => { supabase.removeChannel(channel); };
+    }, []);
+
+    if (newsItems.length === 0) {
+        return (
+            <div className="min-h-screen pt-40 pb-20 container mx-auto px-4 text-center">
+                <h1 className="font-syne text-5xl font-bold text-white mb-4">Latest <span className="text-neon-blue">Intel</span></h1>
+                <p className="text-gray-400">Loading updates...</p>
+            </div>
+        );
+    }
+
     return (
         <div className="min-h-screen pt-40 pb-20 container mx-auto px-4">
             <div className="mb-12">

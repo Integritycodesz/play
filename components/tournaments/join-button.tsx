@@ -4,28 +4,39 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { useRouter } from "next/navigation";
-import { Check, Clock, XCircle } from "lucide-react";
+import { Check, Clock, XCircle, ShieldAlert } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import Link from "next/link";
 
 export function TournamentJoinButton({ tournamentId }: { tournamentId: string }) {
     const { toast } = useToast();
     const router = useRouter();
     const [status, setStatus] = useState<"none" | "pending" | "approved" | "rejected">("none");
     const [isLoading, setIsLoading] = useState(false);
+    const [isAdmin, setIsAdmin] = useState(false);
 
     useEffect(() => {
         const checkStatus = async () => {
-            const localSession = localStorage.getItem("user_session");
-            if (!localSession) return;
-            const user = JSON.parse(localSession);
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.user) {
+                // Check Admin Role
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('role')
+                    .eq('id', session.user.id)
+                    .single();
 
-            if (user.id) {
+                if (profile?.role === 'admin') {
+                    setIsAdmin(true);
+                    return;
+                }
+
                 try {
                     const { data, error } = await supabase
                         .from('teams')
                         .select('status')
                         .eq('tournament_id', tournamentId)
-                        .eq('captain_id', user.id)
+                        .eq('captain_id', session.user.id)
                         .maybeSingle();
 
                     if (data) {
@@ -106,6 +117,16 @@ export function TournamentJoinButton({ tournamentId }: { tournamentId: string })
             setIsLoading(false);
         }
     };
+
+    if (isAdmin) {
+        return (
+            <Link href="/admin">
+                <Button className="w-full bg-red-500/10 text-red-500 hover:bg-red-500/20 font-bold h-12 text-lg border border-red-500/50">
+                    <ShieldAlert className="mr-2 h-5 w-5" /> Manage Tournament
+                </Button>
+            </Link>
+        );
+    }
 
     if (status === "approved") {
         return (

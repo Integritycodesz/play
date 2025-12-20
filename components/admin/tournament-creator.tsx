@@ -1,15 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, DollarSign, Users, Calendar, Trash2, Map } from "lucide-react";
+import { Plus, DollarSign, Users, Calendar, Trash2, Map, ShieldAlert } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { Tournament } from "@/types";
+import { supabase } from "@/lib/supabaseClient";
 
 export function TournamentCreator() {
     const { toast } = useToast();
@@ -23,14 +24,30 @@ export function TournamentCreator() {
     const [description, setDescription] = useState("");
     const [bannerUrl, setBannerUrl] = useState("");
 
+    // Management State
+    const [existingTournaments, setExistingTournaments] = useState<any[]>([]);
+
     // Match Schedule State
-    const [matches, setMatches] = useState<{ name: string; map: string }[]>([]);
+    const [matches, setMatches] = useState<{ name: string; map: string; stage: string }[]>([]);
     const [matchName, setMatchName] = useState("");
     const [matchMap, setMatchMap] = useState("Erangel");
+    const [matchStage, setMatchStage] = useState("Group Stage");
+
+    const fetchTournaments = async () => {
+        const { data } = await supabase
+            .from('tournaments')
+            .select('*')
+            .order('created_at', { ascending: false });
+        if (data) setExistingTournaments(data);
+    };
+
+    useEffect(() => {
+        fetchTournaments();
+    }, []);
 
     const addMatch = () => {
         if (!matchName) return;
-        setMatches([...matches, { name: matchName, map: matchMap }]);
+        setMatches([...matches, { name: matchName, map: matchMap, stage: matchStage }]);
         setMatchName("");
     };
 
@@ -38,7 +55,20 @@ export function TournamentCreator() {
         setMatches(matches.filter((_, i) => i !== index));
     };
 
-    const handleLaunch = () => {
+    const handleDelete = async (id: string, title: string) => {
+        if (!confirm(`Are you sure you want to delete "${title}"? This will remove all matches and teams associated with it.`)) return;
+
+        const { error } = await supabase.from('tournaments').delete().eq('id', id);
+
+        if (error) {
+            toast({ title: "Error", description: "Failed to delete tournament.", variant: "destructive" });
+        } else {
+            toast({ title: "Deleted", description: "Tournament deleted successfully.", variant: "default" });
+            setExistingTournaments(prev => prev.filter(t => t.id !== id));
+        }
+    };
+
+    const handleLaunch = async () => {
         // Validation
         if (!title || !startDate || !prizePool || !maxSlots) {
             toast({
@@ -49,200 +79,257 @@ export function TournamentCreator() {
             return;
         }
 
-        // Create new object
-        const newTournament: Tournament = {
-            id: Date.now().toString(),
+        const payload = {
             title,
             description: description || "No description provided.",
-            banner_url: bannerUrl || "/tournament_scrims.png", // Use input or fallback
+            banner_url: bannerUrl || "/tournament_scrims.png",
             start_date: startDate,
-            status: "open", // Default to open for registration
+            status: "open",
             prize_pool: parseInt(prizePool) || 0,
             max_slots: parseInt(maxSlots) || 0,
             registered_teams: 0,
             format: format as "solo" | "duo" | "squad",
             rules: ["Standard PMPL Rules"],
-            matches: matches,
         };
+        console.log("Creating Tournament with payload:", payload);
 
-        // Save to LocalStorage
-        const existingData = localStorage.getItem("custom_tournaments");
-        const tournaments = existingData ? JSON.parse(existingData) : [];
-        tournaments.push(newTournament);
-        localStorage.setItem("custom_tournaments", JSON.stringify(tournaments));
+        const { data: tournamentData, error: tError } = await supabase
+            .from('tournaments')
+            .insert(payload)
+            .select()
+            .single();
+
+        if (tError || !tournamentData) {
+            console.error(tError);
+            toast({
+                title: "Error",
+                description: `Failed to create tournament: ${tError?.message || "Unknown Error"}`,
+                variant: "destructive"
+            });
+            return;
+        }
+
+        // Create Matches linked to Tournament
+        if (matches.length > 0) {
+            const matchesToInsert = matches.map(m => ({
+                tournament_id: tournamentData.id,
+                name: m.name,
+                map: m.map,
+                stage: m.stage,
+                status: 'scheduled'
+            }));
+
+            const { error: mError } = await supabase.from('matches').insert(matchesToInsert);
+            if (mError) {
+                console.error(mError);
+                toast({ title: "Warning", description: "Tournament created but matches failed to save.", variant: "warning" });
+            }
+        }
 
         // Feedback
         toast({
-            title: "Tournament Launched!",
-            description: `"${title}" has been created and is now visible.`,
+            title: "Success",
+            description: "Tournament Launched!",
             className: "bg-neon-green text-black border-none"
         });
 
-        // Reset Form
+        // Reset
         setTitle("");
         setPrizePool("");
         setMaxSlots("");
         setStartDate("");
-        setDescription("");
-        setBannerUrl("");
-
-        // Redirect to tournaments page to see the result
-        // We use a small timeout to let the toast be seen
-        setTimeout(() => {
-            window.location.href = "/tournaments";
-        }, 1000);
+        setMatches([]);
+        fetchTournaments(); // Refresh list
     };
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-8">
             <Card className="glass-panel border-white/10">
                 <CardHeader>
-                    <CardTitle className="font-syne text-xl text-white">Create New Tournament</CardTitle>
+                    <CardTitle className="font-syne text-xl text-white">New Tournament Details</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <CardContent className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">
-                            <Label htmlFor="t-title" className="text-gray-400">Tournament Title</Label>
+                            <Label>Tournament Title</Label>
                             <Input
-                                id="t-title"
-                                placeholder="e.g. Winter Championship 2025"
-                                className="bg-white/5 border-white/10 text-white"
                                 value={title}
                                 onChange={(e) => setTitle(e.target.value)}
+                                placeholder="e.g. Winter Championship 2025"
+                                className="bg-black/50 border-white/10"
                             />
                         </div>
+
                         <div className="space-y-2">
-                            <Label htmlFor="t-format" className="text-gray-400">Format</Label>
+                            <Label>Format</Label>
                             <Select value={format} onValueChange={setFormat}>
-                                <SelectTrigger className="bg-white/5 border-white/10 text-white">
-                                    <SelectValue placeholder="Select Format" />
+                                <SelectTrigger className="bg-black/50 border-white/10">
+                                    <SelectValue />
                                 </SelectTrigger>
-                                <SelectContent className="bg-neutral-900 border-white/10 text-white">
-                                    <SelectItem value="squad">Squad (4v4)</SelectItem>
-                                    <SelectItem value="duo">Duo (2v2)</SelectItem>
+                                <SelectContent>
                                     <SelectItem value="solo">Solo</SelectItem>
+                                    <SelectItem value="duo">Duo</SelectItem>
+                                    <SelectItem value="squad">Squad (4v4)</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
-                    </div>
 
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                         <div className="space-y-2">
-                            <Label htmlFor="t-pool" className="text-gray-400">Prize Pool ($)</Label>
+                            <Label>Prize Pool ($)</Label>
                             <div className="relative">
-                                <DollarSign className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
+                                <DollarSign className="absolute left-3 top-3 h-4 w-4 text-neon-green" />
                                 <Input
-                                    id="t-pool"
-                                    type="number"
-                                    placeholder="10000"
-                                    className="pl-9 bg-white/5 border-white/10 text-white"
                                     value={prizePool}
                                     onChange={(e) => setPrizePool(e.target.value)}
+                                    type="number"
+                                    className="pl-9 bg-black/50 border-white/10"
+                                    placeholder="5000"
                                 />
                             </div>
                         </div>
+
                         <div className="space-y-2">
-                            <Label htmlFor="t-slots" className="text-gray-400">Max Slots</Label>
+                            <Label>Max Slots</Label>
                             <div className="relative">
-                                <Users className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
+                                <Users className="absolute left-3 top-3 h-4 w-4 text-neon-blue" />
                                 <Input
-                                    id="t-slots"
-                                    type="number"
-                                    placeholder="100"
-                                    className="pl-9 bg-white/5 border-white/10 text-white"
                                     value={maxSlots}
                                     onChange={(e) => setMaxSlots(e.target.value)}
+                                    type="number"
+                                    className="pl-9 bg-black/50 border-white/10"
+                                    placeholder="64"
                                 />
                             </div>
                         </div>
+
                         <div className="space-y-2">
-                            <Label htmlFor="t-date" className="text-gray-400">Start Date</Label>
+                            <Label>Start Date</Label>
                             <div className="relative">
-                                <Calendar className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
                                 <Input
-                                    id="t-date"
-                                    type="date"
-                                    className="pl-9 bg-white/5 border-white/10 text-white block w-full"
                                     value={startDate}
                                     onChange={(e) => setStartDate(e.target.value)}
+                                    type="datetime-local"
+                                    className="bg-black/50 border-white/10"
                                 />
                             </div>
                         </div>
                     </div>
 
-                    <div className="space-y-4">
-                        <Label className="text-gray-400">Match Schedule</Label>
-                        <div className="flex gap-4">
-                            <Input
-                                placeholder="Match Name (e.g. QF 1)"
-                                className="bg-white/5 border-white/10 text-white flex-1"
-                                value={matchName}
-                                onChange={(e) => setMatchName(e.target.value)}
-                            />
-                            <Select value={matchMap} onValueChange={setMatchMap}>
-                                <SelectTrigger className="w-[180px] bg-white/5 border-white/10 text-white">
+                    <div className="space-y-2">
+                        <Label>Match Schedule</Label>
+                        <div className="flex gap-2">
+                            <Select value={matchStage} onValueChange={setMatchStage}>
+                                <SelectTrigger className="w-[140px] bg-black/50 border-white/10">
                                     <SelectValue />
                                 </SelectTrigger>
-                                <SelectContent className="bg-neutral-900 border-white/10 text-white">
+                                <SelectContent>
+                                    <SelectItem value="Group Stage">Group Stage</SelectItem>
+                                    <SelectItem value="Quarter Finals">Quarter Finals</SelectItem>
+                                    <SelectItem value="Semi Finals">Semi Finals</SelectItem>
+                                    <SelectItem value="Grand Finals">Grand Finals</SelectItem>
+                                </SelectContent>
+                            </Select>
+
+                            <Input
+                                value={matchName}
+                                onChange={(e) => setMatchName(e.target.value)}
+                                placeholder="Match Name (e.g. Group A - Match 1)"
+                                className="bg-black/50 border-white/10"
+                            />
+                            <Select value={matchMap} onValueChange={setMatchMap}>
+                                <SelectTrigger className="w-[140px] bg-black/50 border-white/10">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
                                     <SelectItem value="Erangel">Erangel</SelectItem>
                                     <SelectItem value="Miramar">Miramar</SelectItem>
                                     <SelectItem value="Sanhok">Sanhok</SelectItem>
                                     <SelectItem value="Vikendi">Vikendi</SelectItem>
-                                    <SelectItem value="Livik">Livik</SelectItem>
                                 </SelectContent>
                             </Select>
-                            <Button onClick={addMatch} className="bg-neon-blue text-black hover:bg-neon-blue/80">
-                                <Plus className="h-4 w-4" />
+                            <Button onClick={addMatch} size="icon" className="bg-neon-blue hover:bg-neon-blue/80">
+                                <Plus className="h-4 w-4 text-black" />
                             </Button>
                         </div>
 
-                        <div className="space-y-2">
-                            {matches.map((m, i) => (
-                                <div key={i} className="flex justify-between items-center p-3 rounded bg-white/5 border border-white/10">
-                                    <div className="flex items-center gap-3">
-                                        <Map className="h-4 w-4 text-neon-yellow" />
-                                        <span className="text-white font-medium">{m.name}</span>
-                                        <span className="text-xs text-gray-400 uppercase tracking-wider border border-white/20 px-2 py-0.5 rounded">{m.map}</span>
+                        {matches.length > 0 && (
+                            <div className="mt-4 space-y-2">
+                                {matches.map((match, index) => (
+                                    <div key={index} className="flex items-center justify-between p-3 rounded bg-white/5 border border-white/10">
+                                        <div className="flex items-center gap-3">
+                                            <Map className="h-4 w-4 text-gray-400" />
+                                            <span className="text-neon-yellow font-bold text-xs uppercase tracking-wider">{match.stage}</span>
+                                            <span>{match.name}</span>
+                                            <span className="text-xs px-2 py-1 rounded bg-black/50 text-gray-300">{match.map}</span>
+                                        </div>
+                                        <Button variant="ghost" size="sm" onClick={() => removeMatch(index)} className="text-red-500 hover:text-red-400">
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
                                     </div>
-                                    <Button variant="ghost" size="sm" onClick={() => removeMatch(i)} className="text-gray-500 hover:text-red-500 h-8 w-8 p-0">
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            ))}
-                            {matches.length === 0 && (
-                                <p className="text-xs text-gray-600 italic">No matches added yet.</p>
-                            )}
-                        </div>
+                                ))}
+                            </div>
+                        )}
+                        {matches.length === 0 && (
+                            <p className="text-sm text-gray-500 italic">No matches added yet.</p>
+                        )}
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="t-banner" className="text-gray-400">Banner Image URL (Optional)</Label>
+                        <Label>Banner Image URL (Optional)</Label>
                         <Input
-                            id="t-banner"
-                            placeholder="https://example.com/image.jpg"
-                            className="bg-white/5 border-white/10 text-white"
                             value={bannerUrl}
                             onChange={(e) => setBannerUrl(e.target.value)}
+                            placeholder="https://example.com/image.jpg"
+                            className="bg-black/50 border-white/10"
                         />
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="t-desc" className="text-gray-400">Description</Label>
+                        <Label>Description</Label>
                         <Textarea
-                            id="t-desc"
-                            placeholder="Tournament rules, maps, and details..."
-                            className="bg-white/5 border-white/10 text-white min-h-[100px]"
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
+                            placeholder="Tournament details, rules, etc."
+                            className="bg-black/50 border-white/10 min-h-[100px]"
                         />
                     </div>
 
-                    <Button
-                        onClick={handleLaunch}
-                        className="w-full bg-[#f2a900] text-black font-bold hover:bg-[#d69500] h-12 text-lg"
-                    >
-                        <Plus className="mr-2 h-5 w-5" /> Launch Tournament
+                    <Button onClick={handleLaunch} className="w-full bg-neon-yellow text-black font-bold hover:bg-neon-yellow/80">
+                        <Plus className="mr-2 h-4 w-4" /> Launch Tournament
                     </Button>
+                </CardContent>
+            </Card>
+
+            <Card className="glass-panel border-white/10">
+                <CardHeader>
+                    <CardTitle className="font-syne text-xl text-white flex items-center gap-2">
+                        <ShieldAlert className="h-5 w-5 text-red-500" />
+                        Manage Tournaments
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="space-y-4">
+                        {existingTournaments.map(t => (
+                            <div key={t.id} className="flex items-center justify-between p-4 rounded-lg bg-white/5 border border-white/10">
+                                <div>
+                                    <h4 className="font-bold text-white">{t.title}</h4>
+                                    <p className="text-sm text-gray-400">
+                                        Format: {t.format} • Slots: {t.registered_teams}/{t.max_slots} • Prize: ${t.prize_pool}
+                                    </p>
+                                </div>
+                                <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={() => handleDelete(t.id, t.title)}
+                                >
+                                    <Trash2 className="h-4 w-4 mr-2" /> Delete
+                                </Button>
+                            </div>
+                        ))}
+                        {existingTournaments.length === 0 && (
+                            <p className="text-gray-500">No active tournaments found.</p>
+                        )}
+                    </div>
                 </CardContent>
             </Card>
         </div>

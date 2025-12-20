@@ -9,14 +9,12 @@ import { TournamentOverview } from "@/components/tournaments/detail/overview";
 import { TournamentBracket } from "@/components/tournaments/detail/bracket";
 import { TournamentTeams } from "@/components/tournaments/detail/teams";
 import { Tournament } from "@/types";
-import { TournamentJoinButton } from "@/components/tournaments/join-button";
 import { supabase } from "@/lib/supabaseClient";
+import { TeamRegistration } from "@/components/tournaments/team-registration";
 
 interface TournamentDetailViewProps {
     id: string;
 }
-
-
 
 export function TournamentDetailView({ id }: TournamentDetailViewProps) {
     const [tournament, setTournament] = useState<Tournament | null>(null);
@@ -100,8 +98,6 @@ export function TournamentDetailView({ id }: TournamentDetailViewProps) {
                     </Badge>
                     <h1 className="font-syne text-4xl font-bold uppercase md:text-6xl text-white drop-shadow-lg">{tournament.title}</h1>
 
-
-
                     <div className="mt-6 flex flex-wrap gap-6 text-sm font-medium text-gray-300">
                         <div className="flex items-center gap-2">
                             <Trophy className="text-neon-yellow h-5 w-5" />
@@ -135,7 +131,7 @@ export function TournamentDetailView({ id }: TournamentDetailViewProps) {
                             </TabsContent>
 
                             <TabsContent value="bracket" className="mt-0">
-                                <TournamentBracket />
+                                <TournamentBracket tournamentId={tournament.id} />
                             </TabsContent>
 
                             <TabsContent value="teams" className="mt-0">
@@ -149,7 +145,9 @@ export function TournamentDetailView({ id }: TournamentDetailViewProps) {
                         <div className="glass-panel p-6 rounded-xl sticky top-24">
                             <h3 className="font-syne text-xl font-bold text-white mb-2">Registration Open</h3>
                             <p className="text-sm text-gray-400 mb-6">Slots are filling up fast. Register your team now.</p>
-                            <TournamentJoinButton tournamentId={tournament.id} />
+
+                            <TeamRegistration tournamentId={tournament.id} />
+
                             <p className="mt-4 text-center text-xs text-gray-500">
                                 Registration closes in 2 days.
                             </p>
@@ -160,3 +158,4 @@ export function TournamentDetailView({ id }: TournamentDetailViewProps) {
         </div>
     );
 }
+

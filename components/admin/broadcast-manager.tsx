@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AlertCircle, Megaphone, Trash2, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { supabase } from "@/lib/supabaseClient";
 
 interface BroadcastMessage {
     id: string;
@@ -29,14 +30,31 @@ export function BroadcastManager() {
     const [type, setType] = useState<"info" | "warning" | "destructive">("info");
 
     useEffect(() => {
-        // Load active broadcast from local storage
-        const saved = localStorage.getItem("system_broadcast");
-        if (saved) {
-            setActiveBroadcast(JSON.parse(saved));
-        }
+        // Load active broadcast from Supabase
+        const fetchBroadcast = async () => {
+            const { data } = await supabase
+                .from('broadcasts')
+                .select('*')
+                .eq('is_active', true)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle(); // Use maybeSingle to avoid error if none
+
+            if (data) {
+                setActiveBroadcast({
+                    id: data.id,
+                    title: data.title,
+                    message: data.message,
+                    type: data.type as any,
+                    timestamp: data.created_at,
+                    active: data.is_active
+                });
+            }
+        };
+        fetchBroadcast();
     }, []);
 
-    const handleSendBroadcast = () => {
+    const handleSendBroadcast = async () => {
         if (!title || !message) {
             toast({
                 title: "Validation Error",
@@ -46,33 +64,46 @@ export function BroadcastManager() {
             return;
         }
 
-        const newBroadcast: BroadcastMessage = {
-            id: Date.now().toString(),
+        // Deactivate all previous broadcasts first (system policy: only 1 active)
+        await supabase.from('broadcasts').update({ is_active: false }).neq('id', '00000000-0000-0000-0000-000000000000'); // safe update
+
+        const { data, error } = await supabase.from('broadcasts').insert({
             title,
             message,
             type,
-            timestamp: new Date().toISOString(),
-            active: true
+            is_active: true
+        }).select().single();
+
+        if (error) {
+            toast({ title: "Error", description: "Failed to send broadcast.", variant: "destructive" });
+            return;
+        }
+
+        const newBroadcast: BroadcastMessage = {
+            id: data.id,
+            title: data.title,
+            message: data.message,
+            type: data.type as any,
+            timestamp: data.created_at,
+            active: data.is_active
         };
 
         setActiveBroadcast(newBroadcast);
-        localStorage.setItem("system_broadcast", JSON.stringify(newBroadcast));
-        window.dispatchEvent(new Event("broadcast-update"));
+        setTitle("");
+        setMessage("");
 
         toast({
             title: "Broadcast Sent",
             description: "System message is now live for all users.",
         });
-
-        // Reset form
-        setTitle("");
-        setMessage("");
     };
 
-    const handleClearBroadcast = () => {
+    const handleClearBroadcast = async () => {
+        if (!activeBroadcast) return;
+
+        await supabase.from('broadcasts').update({ is_active: false }).eq('id', activeBroadcast.id);
         setActiveBroadcast(null);
-        localStorage.removeItem("system_broadcast");
-        window.dispatchEvent(new Event("broadcast-update"));
+
         toast({
             title: "Broadcast Cleared",
             description: "The system message has been removed.",

@@ -1,19 +1,23 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { ScoreEntry } from "@/components/admin/score-entry";
-import { NewsManager } from "@/components/admin/news-manager";
-import { TournamentCreator } from "@/components/admin/tournament-creator";
-import { VerifyTeams } from "@/components/admin/verify-teams";
-import { BroadcastManager } from "@/components/admin/broadcast-manager";
-import { Users, Trophy, AlertCircle, FileText, Swords, FileOutput, Shield, Megaphone } from "lucide-react";
+import dynamic from "next/dynamic";
+import { Users, Trophy, AlertCircle, FileText, Swords, Shield, Megaphone } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
 import { useState, useEffect } from "react";
-
 import { supabase } from "@/lib/supabaseClient";
 import { useRouter } from "next/navigation";
+
+// Dynamic Imports for Performance
+const ScoreEntry = dynamic(() => import("@/components/admin/score-entry").then(mod => mod.ScoreEntry), { loading: () => <p>Loading Scores...</p> });
+const NewsManager = dynamic(() => import("@/components/admin/news-manager").then(mod => mod.NewsManager), { loading: () => <p>Loading News...</p> });
+const TournamentCreator = dynamic(() => import("@/components/admin/tournament-creator").then(mod => mod.TournamentCreator), { loading: () => <p>Loading Creator...</p> });
+const VerifyTeams = dynamic(() => import("@/components/admin/verify-teams").then(mod => mod.VerifyTeams), { loading: () => <p>Loading Verification...</p> });
+const BroadcastManager = dynamic(() => import("@/components/admin/broadcast-manager").then(mod => mod.BroadcastManager), { loading: () => <p>Loading Broadcast...</p> });
+const UserManagement = dynamic(() => import("@/components/admin/user-management").then(mod => mod.UserManagement), { loading: () => <p>Loading Users...</p> });
+const TournamentManager = dynamic(() => import("@/components/admin/tournament-manager").then(mod => mod.TournamentManager), { loading: () => <p>Loading Tournaments...</p> });
 
 export default function AdminPage() {
     const { toast } = useToast();
@@ -68,13 +72,15 @@ export default function AdminPage() {
                 const { count: playersCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
 
                 // 2. Tournaments
-                const { count: tournamentsCount } = await supabase.from('tournaments').select('*', { count: 'exact', head: true });
+                const { count: tournamentsCount, error: tErr } = await supabase.from('tournaments').select('*', { count: 'exact' });
+                if (tErr) console.error("Tournaments Count Error:", tErr);
 
-                // 3. Pending Requests (Teams with status='pending')
-                const { count: pendingCount } = await supabase.from('teams').select('*', { count: 'exact', head: true }).eq('status', 'pending');
+                // 3. Pending Requests
+                const { count: pendingCount, error: pErr } = await supabase.from('teams').select('*', { count: 'exact' }).eq('status', 'pending');
+                if (pErr) console.error("Pending Count Error:", pErr);
 
-                // 4. Total Signups (Total Teams)
-                const { count: signupsCount } = await supabase.from('teams').select('*', { count: 'exact', head: true });
+                // 4. Total Signups
+                const { count: signupsCount } = await supabase.from('teams').select('*', { count: 'exact' });
 
                 setStats({
                     players: (playersCount || 0).toLocaleString(),
@@ -139,6 +145,12 @@ export default function AdminPage() {
                             <TabsTrigger value="scores" className="data-[state=active]:bg-neon-red data-[state=active]:text-white font-syne py-2 px-6 flex items-center gap-2">
                                 <Swords className="h-4 w-4" /> Match Scores
                             </TabsTrigger>
+                            <TabsTrigger value="users" className="data-[state=active]:bg-neon-blue data-[state=active]:text-black font-syne py-2 px-6 flex items-center gap-2">
+                                <Users className="h-4 w-4" /> Users
+                            </TabsTrigger>
+                            <TabsTrigger value="tournaments" className="data-[state=active]:bg-neon-purple data-[state=active]:text-white font-syne py-2 px-6 flex items-center gap-2">
+                                <Trophy className="h-4 w-4" /> Manage Tournaments
+                            </TabsTrigger>
                             <TabsTrigger value="news" className="data-[state=active]:bg-neon-blue data-[state=active]:text-black font-syne py-2 px-6 flex items-center gap-2">
                                 <FileText className="h-4 w-4" /> News Manager
                             </TabsTrigger>
@@ -155,6 +167,14 @@ export default function AdminPage() {
 
                         <TabsContent value="scores" className="mt-0">
                             <ScoreEntry />
+                        </TabsContent>
+
+                        <TabsContent value="users" className="mt-0">
+                            <UserManagement />
+                        </TabsContent>
+
+                        <TabsContent value="tournaments" className="mt-0">
+                            <TournamentManager />
                         </TabsContent>
 
                         <TabsContent value="news" className="mt-0">

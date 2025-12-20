@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { AlertCircle, X, Info, AlertTriangle, ShieldAlert } from "lucide-react";
 import { usePathname } from "next/navigation";
+import { supabase } from "@/lib/supabaseClient";
 
 interface BroadcastMessage {
     id: string;
@@ -19,35 +20,55 @@ export function GlobalBroadcast() {
     const pathname = usePathname();
 
     useEffect(() => {
-        // Function to check for broadcasts
-        const checkBroadcast = () => {
-            const saved = localStorage.getItem("system_broadcast");
-            if (saved) {
-                const message = JSON.parse(saved);
-                if (message.active) {
-                    setBroadcast(message);
-                    setIsVisible(true);
-                } else {
-                    setBroadcast(null);
-                }
+        const fetchActive = async () => {
+            const { data } = await supabase
+                .from('broadcasts')
+                .select('*')
+                .eq('is_active', true)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+            if (data) {
+                setBroadcast({
+                    id: data.id,
+                    title: data.title,
+                    message: data.message,
+                    type: data.type as any,
+                    timestamp: data.created_at,
+                    active: data.is_active
+                });
+                setIsVisible(true);
             } else {
                 setBroadcast(null);
             }
         };
 
-        // Check immediately
-        checkBroadcast();
+        fetchActive();
 
-        // Check on route change (simulating real-time check)
-        checkBroadcast();
-
-        // Optional: Add an event listener for storage changes (for multiple tabs)
-        window.addEventListener('storage', checkBroadcast);
-        window.addEventListener('broadcast-update', checkBroadcast);
+        const channel = supabase
+            .channel('public:broadcasts')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'broadcasts', filter: 'is_active=eq.true' }, (payload) => {
+                setBroadcast({
+                    id: payload.new.id,
+                    title: payload.new.title,
+                    message: payload.new.message,
+                    type: payload.new.type as any,
+                    timestamp: payload.new.created_at,
+                    active: payload.new.is_active
+                });
+                setIsVisible(true);
+            })
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'broadcasts' }, (payload) => {
+                if (payload.new.is_active === false) {
+                    // Check if it was the current one
+                    setBroadcast(current => current?.id === payload.new.id ? null : current);
+                }
+            })
+            .subscribe();
 
         return () => {
-            window.removeEventListener('storage', checkBroadcast);
-            window.removeEventListener('broadcast-update', checkBroadcast);
+            supabase.removeChannel(channel);
         };
     }, [pathname]);
 

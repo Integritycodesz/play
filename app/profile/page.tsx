@@ -20,13 +20,24 @@ export default function ProfilePage() {
     useEffect(() => {
         // Auth Guard & Data Fetching
         const loadProfile = async () => {
-            const session = localStorage.getItem("user_session");
+            const { data: { session } } = await supabase.auth.getSession();
             if (!session) {
                 router.push("/login");
                 return;
             }
 
-            const userData = JSON.parse(session);
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', session.user.id)
+                .single();
+
+            const userData = {
+                ...session.user,
+                ign: profile?.ign || session.user.user_metadata?.ign,
+                role: profile?.role || 'user',
+                email: session.user.email
+            };
             setUser(userData);
 
             // Fetch Registrations from Supabase
@@ -34,7 +45,7 @@ export default function ProfilePage() {
                 const { data, error } = await supabase
                     .from('teams')
                     .select('*')
-                    .eq('captain_id', userData.id);
+                    .eq('captain_id', session.user.id);
 
                 if (data && !error) {
                     const dbRegs = data.map((t: any) => ({
@@ -59,9 +70,6 @@ export default function ProfilePage() {
 
     const handleLogout = async () => {
         await supabase.auth.signOut(); // Clear Supabase Session
-        localStorage.removeItem("user_session");
-        window.dispatchEvent(new Event("user-login"));
-        toast({ title: "Logged Out", description: "See you next time!" });
         router.push("/");
     };
 
