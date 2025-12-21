@@ -8,107 +8,108 @@ import Link from "next/link";
 import { Gamepad2, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
-
 import { supabase } from "@/lib/supabaseClient";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { fetchUserProfile, syncUserSession } from "@/lib/auth-helpers";
+import {
+    Form,
+    FormControl,
+    FormField,
+    FormItem,
+    FormMessage,
+} from "@/components/ui/form";
+
+const loginSchema = z.object({
+    email: z.string().email("Invalid email address"),
+    password: z.string().min(1, "Password is required"),
+});
+
+type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
     const router = useRouter();
     const { toast } = useToast();
     const [isLoading, setIsLoading] = useState(false);
-    const [formData, setFormData] = useState({
-        email: "",
-        password: ""
+
+    const form = useForm<LoginFormValues>({
+        resolver: zodResolver(loginSchema),
+        defaultValues: {
+            email: "",
+            password: "",
+        },
     });
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
-    };
-
     // Auto-Redirect if already logged in
-    // Auto-Redirect & Restore Session if already logged in
     useEffect(() => {
         const checkSession = async () => {
             const { data: { session } } = await supabase.auth.getSession();
             if (session) {
-                // 1. Fetch profile to sync localStorage (Navbar/Admin checks rely on this)
-                const { data: profile } = await supabase
-                    .from('profiles')
-                    .select('*')
-                    .eq('id', session.user.id)
-                    .single();
-
-                const userMeta = {
-                    id: session.user.id,
-                    ign: profile?.ign || session.user.user_metadata?.ign || "Player",
-                    email: session.user.email,
-                    role: profile?.role || "user",
-                    created_at: session.user.created_at
-                };
-
-                // localStorage.setItem("user_session", JSON.stringify(userMeta));
-                // window.dispatchEvent(new Event("user-login")); // Updates Navbar immediately
+                const { profile } = await fetchUserProfile(session.user.id);
+                // We run syncUserSession to get the object, even if we don't store it manually here
+                // (The original code commented out localStorage.setItem)
+                const userMeta = syncUserSession(session.user, profile);
 
                 toast({ title: "Welcome Back", description: "Redirecting to dashboard..." });
 
-                // 2. Redirect based on role
-                if (profile?.role === 'admin') router.push("/admin");
+                if (userMeta.role === 'admin') router.push("/admin");
                 else router.push("/dashboard");
             }
         };
         checkSession();
     }, [router, toast]);
 
-    const handleLogin = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const onSubmit = async (data: LoginFormValues) => {
         setIsLoading(true);
+        toast({ title: "Authenticating...", description: "Verifying credentials..." });
 
-        // 1. Try Supabase Login
         try {
-            const { data, error } = await supabase.auth.signInWithPassword({
-                email: formData.email,
-                password: formData.password
+            const { data: authData, error } = await supabase.auth.signInWithPassword({
+                email: data.email.trim(),
+                password: data.password,
             });
 
-            if (data.user && !error) {
-                // Success: Get Profile Data
-                const { data: profile } = await supabase
-                    .from('profiles')
-                    .select('*')
-                    .eq('id', data.user.id)
-                    .single();
+            if (error) {
+                throw error;
+            }
 
-                // Use profile data or metadata
-                const ign = profile?.ign || data.user.user_metadata?.ign || "Player";
-                const role = profile?.role || "user";
+            if (authData.user) {
+                toast({ title: "Authenticated", description: "Fetching user profile..." });
 
-                const sessionUser = {
-                    id: data.user.id,
-                    ign: ign,
-                    email: data.user.email,
-                    role: role,
-                    created_at: data.user.created_at
-                };
-
-                // localStorage.setItem("user_session", JSON.stringify(sessionUser));
-                // window.dispatchEvent(new Event("user-login"));
+                // Fetch profile with error handling
+                let userMeta;
+                try {
+                    const { profile, error: profileError } = await fetchUserProfile(authData.user.id);
+                    if (profileError) console.warn("Profile fetch warning:", profileError);
+                    userMeta = syncUserSession(authData.user, profile);
+                } catch (profileCatch) {
+                    console.error("Profile sync failed", profileCatch);
+                    // Fallback to basic user session
+                    userMeta = {
+                        id: authData.user.id,
+                        ign: authData.user.email?.split('@')[0] || "User",
+                        email: authData.user.email,
+                        role: "user",
+                        created_at: new Date().toISOString()
+                    };
+                }
 
                 toast({
-                    title: "Welcome back, " + ign,
-                    description: "Successfully logged in via Supabase.",
-                    className: "bg-neon-green text-black border-none"
+                    title: "Welcome back, " + userMeta.ign,
+                    description: "Successfully logged in.",
+                    className: "bg-neon-green text-black border-none",
                 });
 
-                if (role === 'admin') router.push("/admin");
+                if (userMeta.role === 'admin') router.push("/admin");
                 else router.push("/dashboard");
-
-                return; // Stop here if successful
             }
-        } catch (err: any) {
+        } catch (err) {
             console.error("Login error", err);
             toast({
                 title: "Login Failed",
-                description: err.message || "Invalid credentials.",
-                variant: "destructive"
+                description: (err as Error).message || "Invalid credentials.",
+                variant: "destructive",
             });
         } finally {
             setIsLoading(false);
@@ -125,48 +126,62 @@ export default function LoginPage() {
                     <CardTitle className="font-syne text-2xl font-bold">Welcome Back</CardTitle>
                     <CardDescription>Enter your credentials to access your account.</CardDescription>
                 </CardHeader>
-                <form onSubmit={handleLogin}>
-                    <CardContent className="space-y-4">
-                        <div className="space-y-2">
-                            <Input
+                <CardContent className="space-y-4">
+                    <Form {...form}>
+                        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                            <FormField
+                                control={form.control}
                                 name="email"
-                                placeholder="Email"
-                                type="email"
-                                className="bg-white/5 border-white/10"
-                                value={formData.email}
-                                onChange={handleChange}
-                                required
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormControl>
+                                            <Input
+                                                placeholder="Email"
+                                                type="email"
+                                                className="bg-white/5 border-white/10"
+                                                {...field}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
                             />
-                        </div>
-                        <div className="space-y-2">
-                            <Input
+                            <FormField
+                                control={form.control}
                                 name="password"
-                                placeholder="Password"
-                                type="password"
-                                className="bg-white/5 border-white/10"
-                                value={formData.password}
-                                onChange={handleChange}
-                                required
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormControl>
+                                            <Input
+                                                placeholder="Password"
+                                                type="password"
+                                                className="bg-white/5 border-white/10"
+                                                {...field}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
                             />
                             <div className="flex justify-end">
                                 <Link href="/forgot-password" className="text-xs text-gray-400 hover:text-white hover:underline">
                                     Forgot password?
                                 </Link>
                             </div>
-                        </div>
-                    </CardContent>
-                    <CardFooter className="flex flex-col gap-4">
-                        <Button className="w-full bg-neon-yellow text-black font-bold hover:bg-neon-yellow/90" disabled={isLoading}>
-                            {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                            {isLoading ? "Signing In..." : "Sign In"}
-                        </Button>
 
-                        <div className="text-center text-sm text-gray-400">
-                            Don't have an account? <Link href="/register" className="text-neon-blue hover:underline">Sign up</Link>
-                        </div>
-                    </CardFooter>
-                </form>
+                            <Button className="w-full bg-neon-yellow text-black font-bold hover:bg-neon-yellow/90" disabled={isLoading} type="submit">
+                                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                {isLoading ? "Signing In..." : "Sign In"}
+                            </Button>
+                        </form>
+                    </Form>
+                </CardContent>
+                <CardFooter className="flex flex-col gap-4">
+                    <div className="text-center text-sm text-gray-400">
+                        Don&apos;t have an account? <Link href="/register" className="text-neon-blue hover:underline">Sign up</Link>
+                    </div>
+                </CardFooter>
             </Card>
-        </div >
+        </div>
     );
 }

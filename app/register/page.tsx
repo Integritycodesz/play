@@ -9,99 +9,102 @@ import { UserPlus, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/lib/supabaseClient";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { fetchUserProfile, syncUserSession } from "@/lib/auth-helpers";
+import {
+    Form,
+    FormControl,
+    FormField,
+    FormItem,
+    FormMessage,
+} from "@/components/ui/form";
+
+const registrationSchema = z.object({
+    ign: z.string().min(3, "IGN must be at least 3 characters").max(20, "IGN must be at most 20 characters"),
+    pubgId: z.string().regex(/^\d{8,15}$/, "PUBG ID must be 8-15 numeric digits"),
+    email: z.string().email("Invalid email address"),
+    password: z.string()
+        .min(8, "Password must be at least 8 characters")
+        .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+        .regex(/[a-z]/, "Password must contain at least one lowercase letter")
+        .regex(/[0-9]/, "Password must contain at least one number")
+        .regex(/[^A-Za-z0-9]/, "Password must contain at least one special character"),
+    confirmPassword: z.string(),
+}).refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+});
+
+type RegistrationFormValues = z.infer<typeof registrationSchema>;
 
 export default function RegisterPage() {
     const router = useRouter();
     const { toast } = useToast();
-    const [ign, setIgn] = useState("");
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
     const [isLoading, setIsLoading] = useState(false);
+
+    const form = useForm<RegistrationFormValues>({
+        resolver: zodResolver(registrationSchema),
+        defaultValues: {
+            ign: "",
+            pubgId: "",
+            email: "",
+            password: "",
+            confirmPassword: "",
+        },
+    });
 
     // Auto-Redirect & Restore Session if already logged in
     useEffect(() => {
         const checkSession = async () => {
             const { data: { session } } = await supabase.auth.getSession();
             if (session) {
-                // Sync LocalStorage
-                const { data: profile } = await supabase
-                    .from('profiles')
-                    .select('*')
-                    .eq('id', session.user.id)
-                    .single();
-
-                // const userMeta = {
-                //     id: session.user.id,
-                //     ign: profile?.ign || session.user.user_metadata?.ign || "Player",
-                //     email: session.user.email,
-                //     role: profile?.role || "user",
-                //     created_at: session.user.created_at
-                // };
-
-                // localStorage.setItem("user_session", JSON.stringify(userMeta));
-                // window.dispatchEvent(new Event("user-login"));
+                const { profile } = await fetchUserProfile(session.user.id);
+                // Sync session just in case, though we are redirecting
+                const userMeta = syncUserSession(session.user, profile);
 
                 toast({ title: "Already Logged In", description: "Taking you to dashboard..." });
 
-                if (profile?.role === 'admin') router.push("/admin");
+                if (userMeta.role === 'admin') router.push("/admin");
                 else router.push("/dashboard");
             }
         };
         checkSession();
     }, [router, toast]);
 
-    const handleRegister = async () => {
-        if (!ign || !email || !password) {
-            toast({
-                title: "Error",
-                description: "Please fill in all fields.",
-                variant: "destructive"
-            });
-            return;
-        }
-
+    const onSubmit = async (data: RegistrationFormValues) => {
         setIsLoading(true);
 
         try {
             // 1. SignUp with Supabase
-            const { data, error } = await supabase.auth.signUp({
-                email,
-                password,
+            const { data: authData, error } = await supabase.auth.signUp({
+                email: data.email,
+                password: data.password,
                 options: {
                     data: {
-                        ign: ign, // Metadata to be copied to profiles table via trigger
+                        ign: data.ign,
+                        pubg_id: data.pubgId, // Store PUBG ID in metadata
                     },
                 },
             });
 
             if (error) throw error;
 
-            if (data.user) {
-                // 2. Hybrid Sync: Set LocalStorage Session for existing components
-                // const userSession = {
-                //     id: data.user.id,
-                //     ign: ign,
-                //     email: email,
-                //     role: "user", // Default
-                //     created_at: new Date().toISOString()
-                // };
-
-                // localStorage.setItem("user_session", JSON.stringify(userSession));
-                // window.dispatchEvent(new Event("user-login"));
-
+            if (authData.user) {
                 toast({
-                    title: "Welcome, " + ign,
+                    title: "Welcome, " + data.ign,
                     description: "Registration successful! Please check your email to confirm.",
-                    className: "bg-neon-green text-black border-none"
+                    className: "bg-neon-green text-black border-none",
                 });
 
                 router.push("/dashboard");
             }
-        } catch (error: any) {
+        } catch (error) {
             toast({
                 title: "Registration Failed",
-                description: error.message || "Something went wrong.",
-                variant: "destructive"
+                description: (error as Error).message || "Something went wrong.",
+                variant: "destructive",
             });
         } finally {
             setIsLoading(false);
@@ -119,40 +122,115 @@ export default function RegisterPage() {
                     <CardDescription>Join the elite community of gamers.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                        <Input
-                            placeholder="IGN (In-Game Name)"
-                            className="bg-white/5 border-white/10"
-                            value={ign}
-                            onChange={(e) => setIgn(e.target.value)}
-                        />
-                        <Input placeholder="PUBG ID" className="bg-white/5 border-white/10" />
-                    </div>
-                    <Input
-                        placeholder="Email"
-                        type="email"
-                        className="bg-white/5 border-white/10"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                    />
-                    <Input
-                        placeholder="Password"
-                        type="password"
-                        className="bg-white/5 border-white/10"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                    />
-                    <Input placeholder="Confirm Password" type="password" className="bg-white/5 border-white/10" />
+                    <Form {...form}>
+                        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <FormField
+                                    control={form.control}
+                                    name="ign"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormControl>
+                                                <Input
+                                                    placeholder="IGN (In-Game Name)"
+                                                    className="bg-white/5 border-white/10"
+                                                    {...field}
+                                                />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                <FormField
+                                    control={form.control}
+                                    name="pubgId"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormControl>
+                                                <Input
+                                                    placeholder="PUBG ID"
+                                                    className="bg-white/5 border-white/10"
+                                                    {...field}
+                                                />
+                                            </FormControl>
+                                            <FormMessage />
+                                            <p className="text-[10px] text-gray-500 pl-1">8-15 numeric digits</p>
+                                        </FormItem>
+                                    )}
+                                />
+                            </div>
+                            <FormField
+                                control={form.control}
+                                name="email"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormControl>
+                                            <Input
+                                                placeholder="Email"
+                                                type="email"
+                                                className="bg-white/5 border-white/10"
+                                                {...field}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="password"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormControl>
+                                            <Input
+                                                placeholder="Password"
+                                                type="password"
+                                                className="bg-white/5 border-white/10"
+                                                {...field}
+                                            />
+                                        </FormControl>
+                                        <div className="text-xs text-gray-500 space-y-1 pl-1">
+                                            <p>Password must include:</p>
+                                            <ul className="list-disc list-inside space-y-0.5 ml-1">
+                                                <li>8+ characters</li>
+                                                <li>Uppercase & Lowercase letters</li>
+                                                <li>Number & Special character (e.g., !@#)</li>
+                                            </ul>
+                                        </div>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="confirmPassword"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormControl>
+                                            <Input
+                                                placeholder="Confirm Password"
+                                                type="password"
+                                                className="bg-white/5 border-white/10"
+                                                {...field}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <Button
+                                className="w-full bg-neon-blue text-black font-bold hover:bg-neon-blue/90"
+                                type="submit"
+                                disabled={isLoading}
+                            >
+                                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                {isLoading ? "Signing Up..." : "Register"}
+                            </Button>
+                        </form>
+                    </Form>
                 </CardContent>
                 <CardFooter className="flex flex-col gap-4">
-                    <Button
-                        className="w-full bg-neon-blue text-black font-bold hover:bg-neon-blue/90"
-                        onClick={handleRegister}
-                        disabled={isLoading}
-                    >
-                        {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                        {isLoading ? "Signing Up..." : "Register"}
-                    </Button>
                     <div className="text-center text-sm text-gray-400">
                         Already have an account? <Link href="/login" className="text-neon-yellow hover:underline">Log in</Link>
                     </div>

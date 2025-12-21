@@ -5,6 +5,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Trophy, Users, Settings } from "lucide-react";
 import { TournamentCard } from "@/components/tournaments/tournament-card";
+import { NotificationsPopover } from "@/components/dashboard/notifications-popover";
 import { Tournament } from "@/types";
 
 // Mock Data
@@ -32,9 +33,12 @@ export default function DashboardPage() {
                     <h1 className="font-syne text-4xl font-bold text-white">Dashboard</h1>
                     <p className="text-gray-400">Welcome back, Soldier.</p>
                 </div>
-                <Button variant="outline" className="border-white/10 bg-white/5 text-white hover:bg-white/10 gap-2">
-                    <Settings className="h-4 w-4" /> Settings
-                </Button>
+                <div className="flex items-center gap-2">
+                    <NotificationsPopover />
+                    <Button variant="outline" className="border-white/10 bg-white/5 text-white hover:bg-white/10 gap-2">
+                        <Settings className="h-4 w-4" /> Settings
+                    </Button>
+                </div>
             </div>
 
             <Tabs defaultValue="tournaments" className="w-full">
@@ -51,7 +55,7 @@ export default function DashboardPage() {
                     </div>
                     {myTournaments.length === 0 && (
                         <div className="text-center py-20 text-gray-500">
-                            <p>You haven't joined any tournaments yet.</p>
+                            <p>You haven&apos;t joined any tournaments yet.</p>
                         </div>
                     )}
                 </TabsContent>

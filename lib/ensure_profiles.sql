@@ -6,6 +6,7 @@ create table if not exists public.profiles (
   id uuid references auth.users on delete cascade primary key,
   email text,
   ign text, -- In-Game Name
+  pubg_id text, -- PUBG ID
   avatar_url text,
   role text default 'user' check (role in ('user', 'admin')),
   created_at timestamp with time zone default now(),
@@ -30,8 +31,14 @@ create policy "Users can update their own profile" on profiles for update using 
 create or replace function public.handle_new_user() 
 returns trigger as $$
 begin
-  insert into public.profiles (id, email, ign, role)
-  values (new.id, new.email, new.raw_user_meta_data->>'ign', 'user');
+  insert into public.profiles (id, email, ign, role, pubg_id)
+  values (
+    new.id, 
+    new.email, 
+    new.raw_user_meta_data->>'ign', 
+    'user',
+    new.raw_user_meta_data->>'pubg_id'
+  );
   return new;
 end;
 $$ language plpgsql security definer;

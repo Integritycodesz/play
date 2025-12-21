@@ -70,10 +70,16 @@ export function TournamentCreator() {
 
     const handleLaunch = async () => {
         // Validation
-        if (!title || !startDate || !prizePool || !maxSlots) {
+        const missingFields = [];
+        if (!title) missingFields.push("Title");
+        if (!startDate) missingFields.push("Start Date");
+        if (!prizePool) missingFields.push("Prize Pool");
+        if (!maxSlots) missingFields.push("Max Slots");
+
+        if (missingFields.length > 0) {
             toast({
                 title: "Validation Error",
-                description: "Please fill in all required fields (Title, Pool, Slots, Date).",
+                description: `Missing required fields: ${missingFields.join(", ")}.`,
                 variant: "destructive"
             });
             return;

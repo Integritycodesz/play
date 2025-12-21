@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Trash2, AlertTriangle, RefreshCw, Eye, EyeOff } from "lucide-react";
+import { Trash2, AlertTriangle, RefreshCw, Eye, EyeOff, Users } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/lib/supabaseClient";
 import { Badge } from "@/components/ui/badge";
@@ -96,6 +96,87 @@ export function TournamentManager() {
         });
     };
 
+
+    const [isGenerating, setIsGenerating] = useState<string | null>(null);
+
+    const generateGroups = async (tournamentId: string, tournamentTitle: string) => {
+        if (!confirm(`Generate groups for "${tournamentTitle}"? This will shuffle all approved teams and assign them to groups.`)) return;
+
+        setIsGenerating(tournamentId);
+
+        try {
+            // 1. Fetch Approved Teams
+            const { data: teams, error: fetchError } = await supabase
+                .from('teams')
+                .select('id, team_name, captain_id')
+                .eq('tournament_id', tournamentId)
+                .eq('status', 'approved');
+
+            if (fetchError) throw fetchError;
+            if (!teams || teams.length === 0) {
+                toast({
+                    title: "No Teams Found",
+                    description: "Cannot generate groups because there are no approved teams in this tournament.",
+                    variant: "destructive"
+                });
+                return;
+            }
+
+            // 2. Shuffle Teams
+            const shuffled = [...teams].sort(() => Math.random() - 0.5);
+
+            // 3. Balanced Distribution (Round Robin)
+            const MAX_GROUP_SIZE = 16;
+            const totalTeams = shuffled.length;
+            const numGroups = Math.ceil(totalTeams / MAX_GROUP_SIZE);
+
+            const updates = [];
+            const notifications = [];
+
+            for (let i = 0; i < shuffled.length; i++) {
+                // Round Robin Assignment: Team 0 -> Grp A, Team 1 -> Grp B, Team 2 -> Grp C, Team 3 -> Grp A...
+                const groupIndex = i % numGroups;
+                const groupName = `Group ${String.fromCharCode(65 + groupIndex)}`; // Group A, B, C...
+
+                // Prepare Team Update
+                updates.push({
+                    id: shuffled[i].id,
+                    group_name: groupName
+                });
+
+                // Prepare Notification for Captain
+                notifications.push({
+                    user_id: shuffled[i].captain_id,
+                    title: "Tournament Group Assigned",
+                    message: `Your team "${shuffled[i].team_name}" has been placed in **${groupName}** for ${tournamentTitle}.`,
+                    type: 'info'
+                });
+            }
+
+            // 4. Update Database (One by one for now, or create RPC for batch if large)
+            // Using loop for simplicity as Supabase JS doesn't support bulk update with different values easily without upsert/RPC
+            for (const update of updates) {
+                await supabase
+                    .from('teams')
+                    .update({ group_name: update.group_name })
+                    .eq('id', update.id);
+            }
+
+            // 5. Send Notifications
+            if (notifications.length > 0) {
+                await supabase.from('notifications').insert(notifications);
+            }
+
+            toast({ title: "Success", description: `Assigned ${teams.length} teams to ${numGroups} balanced groups.` });
+
+        } catch (error: any) {
+            console.error(error);
+            toast({ title: "Group Generation Failed", description: error.message, variant: "destructive" });
+        } finally {
+            setIsGenerating(null);
+        }
+    };
+
     return (
         <Card className="glass-panel border-white/10">
             <CardHeader className="flex flex-row items-center justify-between">
@@ -156,6 +237,20 @@ export function TournamentManager() {
                                     </TableCell>
                                     <TableCell className="text-gray-300">{tournament.registered_teams}</TableCell>
                                     <TableCell className="text-right flex items-center justify-end gap-2">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="border-neon-blue/50 text-neon-blue hover:bg-neon-blue/10"
+                                            onClick={() => generateGroups(tournament.id, tournament.title)}
+                                            disabled={isGenerating === tournament.id}
+                                        >
+                                            {isGenerating === tournament.id ? (
+                                                <RefreshCw className="h-3 w-3 animate-spin mr-1" />
+                                            ) : (
+                                                <Users className="h-3 w-3 mr-1" />
+                                            )}
+                                            Groups
+                                        </Button>
                                         <ScoringConfigDialog
                                             tournamentId={tournament.id}
                                             currentConfig={tournament.scoring_config}

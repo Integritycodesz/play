@@ -107,10 +107,12 @@ export function Navbar() {
                 <div className="flex items-center gap-4">
                     {user ? (
                         <div className="flex items-center gap-4">
-                            <Link href="/profile" className="hidden sm:inline">
-                                <span className="text-sm text-gray-400 hover:text-white hover:underline transition-colors">
-                                    {user.ign}
-                                </span>
+                            <Link href="/profile">
+                                <Button variant="outline" className="border-neon-blue/50 text-neon-blue hover:bg-neon-blue/10 gap-2">
+                                    <User className="h-4 w-4" />
+                                    <span className="hidden sm:inline">{user.ign}</span>
+                                    <span className="sm:hidden">Profile</span>
+                                </Button>
                             </Link>
                             <Button
                                 onClick={handleLogout}

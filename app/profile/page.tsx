@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { User, Mail, Calendar, Trophy, Crown, Loader2, LogOut } from "lucide-react";
+import { User, Mail, Calendar, Trophy, Crown, Loader2, LogOut, Gamepad2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -36,7 +36,8 @@ export default function ProfilePage() {
                 ...session.user,
                 ign: profile?.ign || session.user.user_metadata?.ign,
                 role: profile?.role || 'user',
-                email: session.user.email
+                email: session.user.email,
+                pubg_id: profile?.pubg_id || session.user.user_metadata?.pubg_id
             };
             setUser(userData);
 
@@ -108,6 +109,13 @@ export default function ProfilePage() {
                             <div>
                                 <p className="text-xs text-gray-500">Email Address</p>
                                 <p className="text-sm font-medium text-white">{user.email}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-3 p-3 rounded-lg bg-white/5">
+                            <Gamepad2 className="h-5 w-5 text-gray-400" />
+                            <div>
+                                <p className="text-xs text-gray-500">PUBG ID</p>
+                                <p className="text-sm font-medium text-neon-yellow">{user.pubg_id || "Not Linked"}</p>
                             </div>
                         </div>
                         <div className="flex items-center gap-3 p-3 rounded-lg bg-white/5">

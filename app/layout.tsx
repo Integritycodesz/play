@@ -5,6 +5,7 @@ import { Navbar } from "@/components/shared/navbar";
 import { Footer } from "@/components/shared/footer";
 import { Toaster } from "@/components/ui/toaster";
 import { GlobalBroadcast } from "@/components/shared/global-broadcast";
+import { PresenceProvider } from "@/components/auth/presence-provider";
 
 // ... existing code ...
 
@@ -34,13 +35,15 @@ export default function RootLayout({
         suppressHydrationWarning
         className={`${outfit.variable} ${syne.variable} bg-background font-sans text-foreground antialiased selection:bg-neon-yellow/30`}
       >
-        <GlobalBroadcast />
-        <Navbar />
-        <main className="min-h-screen pt-0">
-          {children}
-        </main>
-        <Toaster />
-        <Footer />
+        <PresenceProvider>
+          <GlobalBroadcast />
+          <Navbar />
+          <main className="min-h-screen pt-0">
+            {children}
+          </main>
+          <Toaster />
+          <Footer />
+        </PresenceProvider>
       </body>
     </html>
   );

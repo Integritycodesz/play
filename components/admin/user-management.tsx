@@ -10,6 +10,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { MoreHorizontal, Shield, ShieldAlert, Ban, CheckCircle, Search } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/components/ui/use-toast";
+import { usePresence } from "@/components/auth/presence-provider";
 
 interface UserProfile {
     id: string;
@@ -22,6 +23,7 @@ interface UserProfile {
 
 export function UserManagement() {
     const { toast } = useToast();
+    const { onlineUsers } = usePresence();
     const [users, setUsers] = useState<UserProfile[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
@@ -143,8 +145,13 @@ export function UserManagement() {
                                     <TableCell>
                                         {user.is_banned ? (
                                             <Badge className="bg-red-900/50 text-red-200 border-red-800">BANNED</Badge>
+                                        ) : onlineUsers.has(user.id) ? (
+                                            <Badge variant="outline" className="text-neon-green border-neon-green/30 bg-neon-green/5 flex w-fit items-center gap-1.5">
+                                                <span className="h-1.5 w-1.5 rounded-full bg-neon-green animate-pulse" />
+                                                Active
+                                            </Badge>
                                         ) : (
-                                            <Badge variant="outline" className="text-green-500 border-green-500/30">Active</Badge>
+                                            <Badge variant="outline" className="text-gray-500 border-white/10">Offline</Badge>
                                         )}
                                     </TableCell>
                                     <TableCell className="text-right">

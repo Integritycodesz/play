@@ -5,6 +5,13 @@ import { motion } from "framer-motion";
 import { ArrowRight, PlayCircle } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
+
+// Dynamically import the 3D scene to avoid SSR issues
+const ThreeDScene = dynamic(() => import("@/components/landing/three-d-scene"), {
+    ssr: false,
+    loading: () => <div className="absolute inset-0 bg-black" />
+});
 
 export function Hero() {
     const [titleNumber, setTitleNumber] = useState(0);
@@ -25,14 +32,13 @@ export function Hero() {
     }, [titleNumber, titles]);
 
     return (
-        <section className="relative flex min-h-[90vh] items-center justify-center overflow-hidden">
-            {/* Background with Mesh Gradient */}
-            <div className="absolute inset-0 bg-black">
-                <div className="absolute inset-0 bg-[url('/hero-bg-v2.png')] bg-cover bg-center opacity-60" />
-                <div className="mesh-gradient-primary absolute -left-[20%] -top-[20%] h-[150%] w-[150%] opacity-40 mix-blend-overlay" />
-                <div className="absolute inset-0 bg-[url('/grid-pattern.svg')] opacity-10" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-transparent" />
-            </div>
+        <section className="relative flex min-h-[90vh] items-center justify-center overflow-hidden bg-black">
+            {/* 3D Background */}
+            <ThreeDScene />
+
+            {/* Overlay Gradient for readability */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent z-0 pointer-events-none" />
+            <div className="absolute inset-0 bg-[url('/grid-pattern.svg')] opacity-20 pointer-events-none z-0" />
 
             <div className="container relative z-10 mx-auto px-4 text-center">
                 <motion.div
@@ -51,14 +57,14 @@ export function Hero() {
                         </div>
                     </Link>
 
-                    <h1 className="font-syne text-6xl font-bold uppercase leading-tight tracking-tight text-white md:text-8xl">
+                    <h1 className="font-syne text-6xl font-bold uppercase leading-tight tracking-tight text-white md:text-8xl drop-shadow-2xl">
                         Dominate The <br />
                         <span className="relative flex w-full justify-center overflow-hidden text-center md:pb-4 md:pt-1">
                             <span className="invisible opacity-0">Battlegrounds</span>
                             {titles.map((title, index) => (
                                 <motion.span
                                     key={index}
-                                    className="absolute left-0 top-0 w-full font-bold text-transparent bg-clip-text bg-gradient-to-r from-neon-blue to-neon-violet"
+                                    className="absolute left-0 top-0 w-full font-bold text-transparent bg-clip-text bg-gradient-to-r from-neon-blue to-neon-violet drop-shadow-[0_0_15px_rgba(0,240,255,0.5)]"
                                     initial={{ opacity: 0, y: "-100" }}
                                     transition={{ type: "spring", stiffness: 50 }}
                                     animate={
@@ -79,19 +85,19 @@ export function Hero() {
                         </span>
                     </h1>
 
-                    <p className="mx-auto mt-6 max-w-2xl text-lg text-gray-400 md:text-xl">
+                    <p className="mx-auto mt-6 max-w-2xl text-lg text-gray-400 md:text-xl drop-shadow-md">
                         The elite platform for professional PUBG Mobile tournaments.
                         Compete for cash prizes, climb the global leaderboard, and forge your legacy.
                     </p>
 
                     <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
                         <Link href="/tournaments">
-                            <Button size="lg" className="h-14 rounded-full bg-neon-yellow px-8 text-black hover:bg-neon-yellow/90 font-bold text-lg">
+                            <Button size="lg" className="h-14 rounded-full bg-neon-yellow px-8 text-black hover:bg-neon-yellow/90 font-bold text-lg shadow-[0_0_20px_rgba(242,169,0,0.4)] hover:shadow-[0_0_30px_rgba(242,169,0,0.6)] transition-shadow">
                                 Start Competing <ArrowRight className="ml-2 h-5 w-5" />
                             </Button>
                         </Link>
                         <Link href="https://www.youtube.com/watch?v=0yGydjJqK2A" target="_blank" rel="noopener noreferrer">
-                            <Button size="lg" variant="outline" className="h-14 rounded-full border-white/20 px-8 text-white hover:bg-white/10 hover:text-white">
+                            <Button size="lg" variant="outline" className="h-14 rounded-full border-white/20 px-8 text-white hover:bg-white/10 hover:text-white backdrop-blur-sm">
                                 <PlayCircle className="mr-2 h-5 w-5" /> Watch Trailer
                             </Button>
                         </Link>
